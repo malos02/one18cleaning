@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>One:18 — Job Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16283F;
+    --navy-2:#1F3454;
+    --gold:#C79A5D;
+    --gold-light:#E7CE9F;
+    --cream:#FAF6EE;
+    --paper:#FFFFFF;
+    --ink:#20303F;
+    --slate:#6B7A8C;
+    --line:#E4DCCB;
+    --green:#4B7A5E;
+    --green-bg:#EAF2ED;
+    --red:#B5493B;
+    --red-bg:#FBECE9;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
+  }
+  h1,h2,h3,.display{
+    font-family:'Fraunces',Georgia,serif;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  button{font-family:inherit;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    background:var(--navy);
+    color:#fff;
+    padding:14px 16px 16px;
+    box-shadow:0 6px 16px rgba(22,40,63,0.18);
+  }
+  .topbar-row{
+    display:flex; align-items:center; gap:10px;
+  }
+  .seal{
+    width:34px; height:34px; border-radius:50%;
+    border:1.5px solid var(--gold-light);
+    display:flex; align-items:center; justify-content:center;
+    flex:none; position:relative;
+  }
+  .seal::before{
+    content:"✦";
+    color:var(--gold-light);
+    font-size:14px;
+  }
+  .brand{
+    flex:1; min-width:0;
+  }
+  .brand .name{
+    font-family:'Fraunces',serif; font-size:16px; font-weight:600;
+    letter-spacing:0.01em;
+  }
+  .brand .tag{
+    font-size:10.5px; color:var(--gold-light); letter-spacing:0.08em; text-transform:uppercase;
+  }
+  .icon-btn{
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.18);
+    color:#fff;
+    border-radius:10px;
+    padding:8px 12px;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .icon-btn:active{background:rgba(255,255,255,0.18);}
+
+  .job-line{
+    margin-top:14px;
+    display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  }
+  .job-title-input{
+    background:transparent; border:none; color:#fff;
+    font-family:'Fraunces',serif; font-size:19px; font-weight:600;
+    width:100%; padding:0; outline:none;
+  }
+  .job-title-input::placeholder{color:rgba(255,255,255,0.45);}
+  .job-meta{
+    font-size:11.5px; color:rgba(255,255,255,0.6); margin-top:2px;
+  }
+
+  .property-photo-row{
+    display:flex; align-items:center; gap:10px; margin-top:12px;
+  }
+  .property-photo-thumb{
+    width:52px; height:52px; border-radius:10px; overflow:hidden; position:relative; flex:none;
+    border:1px solid rgba(255,255,255,0.25);
+  }
+  .property-photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .property-photo-thumb .rm{
+    position:absolute; top:1px; right:1px; width:16px; height:16px; border-radius:50%;
+    background:rgba(10,16,24,0.75); color:#fff; border:none; font-size:10px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .property-photo-add{
+    width:52px; height:52px; border-radius:10px; border:1.5px dashed rgba(255,255,255,0.4);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:rgba(255,255,255,0.75); font-size:9px; cursor:pointer; flex:none; gap:1px;
+  }
+  .property-photo-add span.plus{font-size:16px; line-height:1; color:var(--gold-light);}
+  .property-photo-text{font-size:11.5px; color:rgba(255,255,255,0.65); line-height:1.3;}
+  .property-photo-text strong{color:#fff; font-weight:600; display:block; font-size:12.5px;}
+
+  .progress-wrap{margin-top:12px;}
+  .progress-labels{
+    display:flex; justify-content:space-between;
+    font-size:11px; color:rgba(255,255,255,0.7); margin-bottom:5px;
+  }
+  .progress-track{
+    height:7px; border-radius:6px; background:rgba(255,255,255,0.14); overflow:hidden;
+  }
+  .progress-fill{
+    height:100%; background:linear-gradient(90deg,var(--gold) 0%, var(--gold-light) 100%);
+    border-radius:6px; transition:width .35s ease;
+  }
+
+  /* ---------- Job details panel ---------- */
+  .details-panel{
+    background:var(--navy-2);
+    margin-top:12px; border-radius:12px; padding:12px;
+    display:none;
+  }
+  .details-panel.open{display:block;}
+  .field-row{display:flex; gap:8px; margin-bottom:8px;}
+  .field-row:last-child{margin-bottom:0;}
+  .field{flex:1; min-width:0;}
+  .field label{display:block; font-size:10px; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;}
+  .field input, .field select{
+    width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2);
+    color:#fff; border-radius:8px; padding:8px 9px; font-size:13.5px; outline:none;
+  }
+  .field select option{color:#111;}
+
+  /* ---------- Job switcher ---------- */
+  .switcher{
+    position:fixed; inset:0; background:rgba(20,30,45,0.55); z-index:60;
+    display:none; align-items:flex-end;
+  }
+  .switcher.open{display:flex;}
+  .switcher-sheet{
+    background:var(--cream); width:100%; max-height:78vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:18px 16px 22px;
+  }
+  .switcher-sheet h3{margin:0 0 12px; font-size:18px;}
+  .job-item{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:8px;
+  }
+  .job-item .info{min-width:0;}
+  .job-item .jname{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .job-item .jmeta{font-size:11.5px; color:var(--slate); margin-top:2px;}
+  .job-item .pct{
+    font-family:'Fraunces',serif; font-size:15px; color:var(--gold); flex:none;
+  }
+  .new-job-btn{
+    width:100%; padding:12px; border-radius:12px; border:1.5px dashed var(--navy);
+    background:transparent; color:var(--navy); font-weight:600; font-size:14px; cursor:pointer; margin-top:4px;
+  }
+  .close-sheet{
+    display:block; margin:14px auto 0; background:none; border:none; color:var(--slate);
+    font-size:13px; text-decoration:underline; cursor:pointer;
+  }
+  .del-job{
+    background:none; border:none; color:var(--red); font-size:11px; cursor:pointer; padding:2px 0;
+  }
+
+  /* ---------- Main content ---------- */
+  main{max-width:640px; margin:0 auto; padding:16px 14px 10px;}
+
+  .service-toggle{
+    display:flex; gap:8px; margin-bottom:16px;
+  }
+  .service-toggle button{
+    flex:1; padding:9px 4px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--paper); color:var(--slate); font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .service-toggle button.active{
+    border-color:var(--navy); background:var(--navy); color:#fff;
+  }
+
+  .section-card{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:14px; overflow:hidden;
+  }
+  .section-head{
+    display:flex; align-items:center; gap:10px; padding:14px 14px;
+    cursor:pointer; user-select:none;
+  }
+  .section-num{
+    font-family:'Fraunces',serif; font-size:13px; color:var(--gold);
+    width:26px; height:26px; border-radius:50%; border:1px solid var(--gold);
+    display:flex; align-items:center; justify-content:center; flex:none;
+  }
+  .section-titles{flex:1; min-width:0;}
+  .section-titles h2{margin:0; font-size:16px;}
+  .section-sub{font-size:11.5px; color:var(--slate); margin-top:1px;}
+  .section-stamp{
+    font-size:10px; font-weight:700; letter-spacing:0.06em; color:var(--green);
+    border:1px solid var(--green); border-radius:20px; padding:3px 8px;
+    transform:rotate(-4deg); text-transform:uppercase; flex:none;
+  }
+  .chevron{
+    width:18px; height:18px; flex:none; transition:transform .2s ease; color:var(--slate);
+  }
+  .section-card.expanded .chevron{transform:rotate(180deg);}
+
+  .section-body{
+    max-height:0; overflow:hidden; transition:max-height .3s ease;
+  }
+  .section-card.expanded .section-body{max-height:4000px;}
+  .section-body-inner{padding:0 14px 16px;}
+
+  .mini-progress{
+    height:4px; background:var(--line); border-radius:4px; margin:0 14px 10px; overflow:hidden;
+  }
+  .mini-progress > div{height:100%; background:var(--gold); border-radius:4px; transition:width .3s ease;}
+
+  .check-item{
+    display:flex; align-items:flex-start; gap:10px; padding:8px 0;
+    border-bottom:1px solid #F1EDE2;
+  }
+  .check-item:last-child{border-bottom:none;}
+  .check-item input[type=checkbox]{
+    appearance:none; -webkit-appearance:none;
+    width:21px; height:21px; border-radius:6px; border:1.6px solid #C9BFA5;
+    flex:none; margin-top:1px; cursor:pointer; position:relative; background:#fff;
+  }
+  .check-item input[type=checkbox]:checked{
+    background:var(--navy); border-color:var(--navy);
+  }
+  .check-item input[type=checkbox]:checked::after{
+    content:""; position:absolute; left:6px; top:2px; width:5px; height:10px;
+    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg);
+  }
+  .check-item label{
+    font-size:14px; line-height:1.4; cursor:pointer;
+  }
+  .check-item.done label{color:var(--slate); text-decoration:line-through;}
+
+  .deep-flag{
+    display:inline-block; font-size:9px; font-weight:700; color:var(--gold);
+    border:1px solid var(--gold); border-radius:4px; padding:1px 5px; margin-left:6px;
+    vertical-align:middle; letter-spacing:0.04em;
+  }
+
+  .item-photo-strip{
+    padding:2px 0 10px 31px;
+    border-bottom:1px solid #F1EDE2;
+  }
+  .item-photo-label{
+    font-size:10.5px; color:var(--red); text-transform:uppercase; letter-spacing:0.05em;
+    margin-bottom:6px; font-weight:600;
+  }
+  .item-note-label{
+    font-size:10.5px; color:var(--red); text-transform:uppercase; letter-spacing:0.05em;
+    margin-bottom:5px; font-weight:600;
+  }
+  .item-note-textarea{
+    width:100%; min-height:56px; resize:vertical; border:1.3px solid var(--line);
+    border-radius:9px; padding:8px 10px; font-family:'Inter',sans-serif; font-size:13px;
+    color:var(--ink); background:#FCFAF4; outline:none; margin-bottom:10px;
+  }
+  .item-note-textarea:focus{border-color:var(--red);}
+  .item-note-textarea::placeholder{color:#A6A08F;}
+  .photo-thumb-sm{width:48px; height:48px; border-radius:7px;}
+  .add-photo-sm{width:48px; height:48px; border-radius:7px; font-size:9px;}
+  .add-photo-sm span.plus{font-size:15px;}
+
+  .photo-block{margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);}
+  .photo-label{
+    font-size:11px; color:var(--slate); text-transform:uppercase; letter-spacing:0.05em;
+    margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .photo-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .photo-thumb{
+    width:64px; height:64px; border-radius:8px; overflow:hidden; position:relative; flex:none;
+    border:1px solid var(--line);
+  }
+  .photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-thumb .rm{
+    position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%;
+    background:rgba(20,30,45,0.75); color:#fff; border:none; font-size:11px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .add-photo{
+    width:64px; height:64px; border-radius:8px; border:1.5px dashed var(--slate);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--slate); font-size:10px; cursor:pointer; flex:none; background:#FCFAF4;
+    gap:2px;
+  }
+  .add-photo span.plus{font-size:18px; line-height:1; color:var(--gold);}
+
+  .repeat-actions{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px 0;
+  }
+  .add-instance-btn{
+    background:none; border:1.5px solid var(--navy); color:var(--navy);
+    border-radius:9px; padding:7px 12px; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .remove-instance-btn{
+    background:none; border:none; color:var(--red); font-size:11.5px; cursor:pointer; text-decoration:underline;
+  }
+  .instance-divider{
+    padding:10px 14px 4px; font-size:12px; font-weight:700; color:var(--navy);
+    display:flex; justify-content:space-between; align-items:center;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+
+  .footer-note{
+    text-align:center; color:var(--slate); font-size:11px; padding:18px 20px 4px; line-height:1.5;
+  }
+
+  /* ---------- Login gate ---------- */
+  .login-gate{
+    position:fixed; inset:0; background:var(--navy); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:24px;
+  }
+  .login-gate.open{display:flex;}
+  .login-card{
+    background:var(--paper); width:100%; max-width:340px; border-radius:16px;
+    padding:26px 22px; text-align:center;
+  }
+  .login-seal{
+    width:44px; height:44px; border-radius:50%; border:1.5px solid var(--gold);
+    margin:0 auto 14px; display:flex; align-items:center; justify-content:center;
+  }
+  .login-seal::before{content:"✦"; color:var(--gold); font-size:18px;}
+  .login-card h2{margin:0 0 4px; font-size:19px; color:var(--navy);}
+  .login-sub{font-size:12.5px; color:var(--slate); margin:0 0 18px;}
+  .login-field{text-align:left; margin-bottom:12px;}
+  .login-field label{
+    display:block; font-size:10.5px; color:var(--slate); text-transform:uppercase;
+    letter-spacing:0.05em; margin-bottom:4px;
+  }
+  .login-field input{
+    width:100%; border:1.3px solid var(--line); border-radius:9px; padding:10px 11px;
+    font-size:14px; outline:none; background:#FCFAF4;
+  }
+  .login-field input:focus{border-color:var(--navy);}
+  .login-error{
+    display:none; background:var(--red-bg); color:var(--red); font-size:12px;
+    border-radius:8px; padding:8px 10px; margin-bottom:12px; text-align:left;
+  }
+  .login-error.show{display:block;}
+  .login-btn{
+    width:100%; background:var(--navy); color:#fff; border:none; border-radius:10px;
+    padding:12px; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .login-btn:disabled{opacity:0.6;}
+
+  /* ---------- Submit job ---------- */
+  .submit-job-btn{
+    width:100%; background:var(--green); color:#fff; border:none; border-radius:12px;
+    padding:14px; font-size:15px; font-weight:700; cursor:pointer; margin-bottom:6px;
+  }
+  .submit-banner{
+    display:flex; align-items:center; gap:10px; background:var(--green-bg);
+    border:1px solid var(--green); border-radius:12px; padding:12px 14px; font-size:13px; color:var(--green);
+  }
+  .submit-banner strong{font-weight:700;}
+  .reopen-btn{
+    margin-left:auto; background:none; border:none; color:var(--green); text-decoration:underline;
+    font-size:12px; cursor:pointer; flex:none;
+  }
+  .status-pill{
+    font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;
+    padding:2px 7px; border-radius:20px; margin-left:6px; flex:none;
+  }
+  .status-pill.submitted{background:var(--green-bg); color:var(--green); border:1px solid var(--green);}
+  .status-pill.in_progress{background:var(--cream); color:var(--slate); border:1px solid var(--line);}
+
+  /* ---------- Safety gate & DO NOT list modal ---------- */
+  .safety-gate{
+    display:flex; align-items:center; gap:12px;
+    background:var(--red-bg); border:1.5px solid var(--red);
+    border-radius:var(--radius); padding:14px; margin-bottom:16px;
+  }
+  .safety-gate-icon{
+    font-size:22px; color:var(--red); flex:none; line-height:1;
+  }
+  .safety-gate-text{flex:1; min-width:0;}
+  .safety-gate-text strong{display:block; font-size:14px; color:var(--red); margin-bottom:2px;}
+  .safety-gate-text span{font-size:12px; color:#7A392F; line-height:1.4; display:block;}
+  .safety-gate-btn{
+    flex:none; background:var(--red); color:#fff; border:none; border-radius:9px;
+    padding:10px 13px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+
+  .safety-confirmed{
+    display:flex; align-items:center; gap:10px;
+    background:var(--green-bg); border:1px solid var(--green);
+    border-radius:12px; padding:10px 13px; margin-bottom:16px; font-size:12.5px; color:var(--green);
+  }
+  .safety-confirmed strong{color:var(--green); font-weight:700;}
+  .safety-confirmed button{
+    margin-left:auto; background:none; border:none; color:var(--green); text-decoration:underline;
+    font-size:12px; cursor:pointer; flex:none;
+  }
+
+  .locked-msg{
+    text-align:center; color:var(--slate); font-size:13px; padding:30px 20px;
+    border:1.5px dashed var(--line); border-radius:var(--radius); background:var(--paper);
+  }
+
+  .safety-modal{
+    position:fixed; inset:0; background:rgba(20,30,45,0.6); z-index:70;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .safety-modal.open{display:flex;}
+  .safety-sheet{
+    background:var(--paper); width:100%; max-width:640px; max-height:90vh;
+    border-radius:18px 18px 0 0; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .safety-sheet-header{
+    background:var(--navy); color:#fff; padding:16px 16px 14px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex:none;
+  }
+  .safety-sheet-header h3{margin:0; font-size:16.5px; line-height:1.3;}
+  .safety-sheet-header .sub{font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;}
+  .safety-close-x{
+    background:rgba(255,255,255,0.12); border:none; color:#fff; width:30px; height:30px;
+    border-radius:50%; font-size:15px; cursor:pointer; flex:none;
+  }
+  .safety-content{
+    padding:16px; overflow-y:auto; flex:1;
+  }
+  .dnl-intro{
+    font-size:12.5px; color:var(--slate); line-height:1.5; margin:0 0 16px;
+    padding-bottom:14px; border-bottom:1px solid var(--line);
+  }
+  .dnl-block{margin-bottom:18px;}
+  .dnl-h{
+    font-family:'Fraunces',serif; font-size:14.5px; font-weight:600; color:var(--navy);
+    margin:0 0 8px; display:flex; align-items:center; gap:6px;
+  }
+  .dnl-h.danger{color:var(--red);}
+  .dnl-list{margin:0; padding:0; list-style:none;}
+  .dnl-list li{
+    font-size:13px; line-height:1.5; padding:6px 0 6px 18px; position:relative;
+    border-bottom:1px solid #F1EDE2;
+  }
+  .dnl-list li:last-child{border-bottom:none;}
+  .dnl-list li::before{
+    content:"–"; position:absolute; left:0; color:var(--red); font-weight:700;
+  }
+  .dnl-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .dnl-table th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em;
+    color:var(--slate); padding:6px 8px 6px 0; border-bottom:1.5px solid var(--navy);
+  }
+  .dnl-table td{
+    padding:9px 8px 9px 0; border-bottom:1px solid #F1EDE2; vertical-align:top; line-height:1.4;
+  }
+  .dnl-table td:first-child{font-weight:600; white-space:nowrap; color:var(--navy);}
+  .dnl-checklist{
+    background:var(--cream); border-radius:10px; padding:12px 14px; margin-top:4px;
+  }
+  .dnl-checklist ol{margin:0; padding-left:18px;}
+  .dnl-checklist li{font-size:13px; line-height:1.6; padding:2px 0;}
+  .dnl-callout{
+    background:var(--navy); color:#fff; border-radius:10px; padding:12px 14px;
+    text-align:center; font-family:'Fraunces',serif; font-weight:600; font-size:14px;
+    letter-spacing:0.02em; margin-top:16px;
+  }
+  .safety-ack-wrap{
+    flex:none; padding:12px 16px 16px; border-top:1px solid var(--line); background:var(--paper);
+  }
+  .safety-ack-btn{
+    width:100%; background:var(--green); color:#fff; border:none; border-radius:11px;
+    padding:13px; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .safety-ack-hint{
+    text-align:center; font-size:10.5px; color:var(--slate); margin:7px 0 0;
+  }
+
+  .toast{
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--navy); color:#fff; padding:9px 16px; border-radius:20px; font-size:12.5px;
+    opacity:0; transition:all .25s ease; z-index:80; pointer-events:none;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .lightbox{
+    position:fixed; inset:0; background:rgba(10,16,24,0.9); z-index:90;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%; max-height:80vh; border-radius:10px;}
+  .lightbox-close{
+    position:absolute; top:18px; right:18px; background:rgba(255,255,255,0.15);
+    color:#fff; border:none; width:36px; height:36px; border-radius:50%; font-size:18px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-gate open" id="loginGate">
+  <div class="login-card">
+    <div class="login-seal"></div>
+    <h2>One:18 Cleaning</h2>
+    <p class="login-sub">Sign in to access your job checklist</p>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" autocomplete="username" placeholder="you@example.com">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-btn" id="loginBtn">Log In</button>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="seal"></div>
+    <div class="brand">
+      <div class="name">One:18 Cleaning</div>
+      <div class="tag">Cleaning With Purpose</div>
+    </div>
+    <button class="icon-btn" id="logoutBtn" style="margin-right:6px;">Log out</button>
+    <button class="icon-btn" id="switchJobsBtn">Jobs</button>
+  </div>
+
+  <div class="job-line">
+    <input class="job-title-input" id="jobNameInput" placeholder="Untitled job — tap to name" />
+  </div>
+  <div class="job-meta" id="jobMetaLine">New job · not saved yet</div>
+
+  <div class="property-photo-row" id="propertyPhotoRow"></div>
+
+  <div class="progress-wrap">
+    <div class="progress-labels">
+      <span id="progressPct">0% complete</span>
+      <span id="progressCount">0 / 0 tasks</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div style="text-align:right; margin-top:8px;">
+    <button class="icon-btn" id="toggleDetailsBtn" style="font-size:11.5px; padding:6px 10px;">Job details ▾</button>
+  </div>
+
+  <div class="details-panel" id="detailsPanel">
+    <div class="field-row">
+      <div class="field">
+        <label>Client name</label>
+        <input id="clientInput" placeholder="e.g. Priya Nair" />
+      </div>
+      <div class="field">
+        <label>Service date</label>
+        <input id="dateInput" type="date" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Property address</label>
+        <input id="addressInput" placeholder="Street, city" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div id="safetyGateArea"></div>
+
+  <div class="service-toggle" id="serviceToggle">
+    <button data-level="standard" class="active">Standard Clean</button>
+    <button data-level="deep">Deep Clean</button>
+  </div>
+
+  <div id="sectionsRoot"></div>
+
+  <div id="submitArea"></div>
+
+  <div class="footer-note">
+    Checklist follows the One:18 Cleaning Professional SOP.<br>
+    Saved automatically on this device as you work.
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="" alt="Job photo">
+</div>
+
+<div class="safety-modal" id="safetyModal">
+  <div class="safety-sheet">
+    <div class="safety-sheet-header">
+      <div>
+        <h3>⚠ Chemical &amp; Surface DO NOT List</h3>
+        <div class="sub">Read before starting any job</div>
+      </div>
+      <button class="safety-close-x" id="safetyCloseX">✕</button>
+    </div>
+    <div class="safety-content">
+      <p class="dnl-intro">Protect clients, cleaning professionals, pets, and property by preventing unsafe chemical combinations and damage to specialty surfaces. When unsure about a product or surface, STOP and verify before proceeding.</p>
+
+      <div class="dnl-block">
+        <h4 class="dnl-h danger">Never Mix Cleaning Chemicals</h4>
+        <ul class="dnl-list">
+          <li>Never mix bleach with ammonia.</li>
+          <li>Never mix bleach with vinegar or other acids.</li>
+          <li>Never mix bleach with toilet bowl cleaners or rust removers.</li>
+          <li>Do not combine cleaning products unless the manufacturer explicitly says the combination is safe.</li>
+          <li>One:18 rule: one cleaning product at a time. Remove/rinse a prior product as directed before changing products.</li>
+        </ul>
+      </div>
+
+      <div class="dnl-block">
+        <h4 class="dnl-h">Products Not to Use Unless Specifically Appropriate / Approved</h4>
+        <ul class="dnl-list">
+          <li>Chlorine bleach / bleach-based cleaners — not for routine use on fabrics, delicate finishes, natural stone, metals, or unknown surfaces.</li>
+          <li>Abrasive powders, steel wool, pumice stones, harsh scouring pads — may scratch stainless steel, glass, acrylic, fiberglass, cooktops, polished fixtures, and stone.</li>
+          <li>Magic Erasers / melamine foam — can dull or remove finish on painted walls, glossy cabinetry, finished wood, stainless steel, high-gloss surfaces.</li>
+          <li>Vinegar / acidic cleaners — never on marble, travertine, limestone, or other acid-sensitive natural stone.</li>
+          <li>Harsh cleaners on quartz — avoid highly acidic/alkaline cleaners, oven cleaner, abrasive powders, and aggressive degreasers unless manufacturer-approved.</li>
+          <li>Oven cleaner — do not use on counters, appliance exteriors, aluminum, cabinetry, floors, or general kitchen surfaces.</li>
+          <li>Toilet bowl cleaner — keep inside the toilet bowl; not a shower, grout, faucet, sink, countertop, tub, or general bathroom cleaner.</li>
+          <li>Furniture polish / oily products — never apply to flooring due to residue and slip risk.</li>
+          <li>Excess dish soap on floors — may leave sticky film, streaks, and dirt-attracting residue.</li>
+        </ul>
+      </div>
+
+      <div class="dnl-block">
+        <h4 class="dnl-h">Surface-Specific DO NOT List</h4>
+        <table class="dnl-table">
+          <tr><th>Surface</th><th>Do Not Use / Do</th></tr>
+          <tr><td>Hardwood</td><td>Do not saturate, leave standing water, use abrasives, or steam unless manufacturer-approved.</td></tr>
+          <tr><td>Laminate</td><td>Do not saturate, leave water in seams, use abrasives, or steam unless manufacturer-approved.</td></tr>
+          <tr><td>Luxury Vinyl Plank</td><td>Avoid abrasive pads, harsh solvents, unapproved wax, and excessive water.</td></tr>
+          <tr><td>Marble / Natural Stone</td><td>No vinegar, lemon, acidic bathroom/toilet cleaners, or abrasive powders. Use stone-safe pH-neutral products.</td></tr>
+          <tr><td>Stainless Steel</td><td>No steel wool or abrasive powders. Avoid prolonged chlorine contact. Clean with the grain.</td></tr>
+          <tr><td>Glass Cooktops</td><td>No steel wool, harsh abrasive powders, knives, or unapproved scrapers.</td></tr>
+          <tr><td>Acrylic / Fiberglass</td><td>No steel wool, pumice, harsh abrasives, or aggressive scrubbers.</td></tr>
+          <tr><td>Painted Walls</td><td>Do not automatically use Magic Erasers, degreasers, bleach, or abrasives. Spot-test appropriate products.</td></tr>
+          <tr><td>TVs / Screens</td><td>Do not spray directly on screens or use ordinary glass cleaner unless manufacturer-approved.</td></tr>
+        </table>
+      </div>
+
+      <div class="dnl-block">
+        <h4 class="dnl-h">Client-Provided &amp; Unlabeled Products</h4>
+        <ul class="dnl-list">
+          <li>A client request does not automatically make a product safe for a surface. Pause and verify when damage is possible.</li>
+          <li>Never use products in unlabeled bottles, unknown homemade mixtures, or chemicals whose contents cannot be identified.</li>
+          <li>Follow product labels, manufacturer surface-care instructions, and Safety Data Sheets (SDS) where applicable.</li>
+        </ul>
+      </div>
+
+      <div class="dnl-block">
+        <h4 class="dnl-h danger">Never "Experiment" on a Client's Property</h4>
+        <ul class="dnl-list">
+          <li>Do not keep escalating to stronger chemicals simply because a stain remains.</li>
+          <li>Remaining discoloration may be permanent staining, etching, finish damage, mineral deposits, bleaching, dye transfer, or deterioration.</li>
+          <li>A stain that remains is better than a permanently damaged surface. Document the condition and report it.</li>
+        </ul>
+      </div>
+
+      <div class="dnl-block">
+        <h4 class="dnl-h">The One:18 5-Second Check</h4>
+        <div class="dnl-checklist">
+          <ol>
+            <li>What surface is this?</li>
+            <li>Is this product approved for that surface?</li>
+            <li>Have I used another chemical here?</li>
+            <li>Could this scratch, discolor, etch, or strip the finish?</li>
+            <li>If I am unsure, have I stopped and verified?</li>
+          </ol>
+        </div>
+        <div class="dnl-callout">WHEN IN DOUBT — DO NOT USE IT.<br>STOP · VERIFY · THEN CLEAN</div>
+      </div>
+    </div>
+    <div class="safety-ack-wrap">
+      <button class="safety-ack-btn" id="safetyAckBtn">I have read and understood this list</button>
+      <p class="safety-ack-hint">Required once per job before the checklist unlocks</p>
+    </div>
+  </div>
+</div>
+
+<div class="switcher" id="switcherOverlay">
+  <div class="switcher-sheet">
+    <h3>Your jobs</h3>
+    <div id="jobList"></div>
+    <button class="new-job-btn" id="newJobBtn">+ Start a new job</button>
+    <button class="close-sheet" id="closeSwitcherBtn">Close</button>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  /* ---------------- Section schema (from the One:18 SOP) ---------------- */
+  const SCHEMA = [
+    { key:'arrival', num:1, title:'Arrival & Property Entry', sub:'Access, walkthrough, pre-existing conditions',
+      items:[
+        'Parked legally, not blocking access',
+        'Used approved entry method only',
+        'Completed brief visual walkthrough',
+        'Documented pre-existing damage / unusual conditions',
+        'Verified client-requested priorities in scope',
+        'Exterior doors secured while working'
+      ],
+      itemPhotoIndices:[3]},
+    { key:'kitchen', num:2, title:'Kitchen', sub:'Standard clean + deep-clean adds',
+      items:[
+        'Removed trash, replaced liner',
+        'Dusted/wiped surfaces & cabinet fronts',
+        'Cleaned & sanitized counters and backsplash',
+        'Cleaned sink, faucet, drain area, fixtures',
+        'Wiped exterior of fridge, dishwasher, oven, microwave',
+        'Cleaned stovetop',
+        'Cleaned microwave interior (if in scope)',
+        'Spot-cleaned switches, handles, doors',
+        'Vacuumed/swept & mopped floor, including edges'
+      ],
+      deepItems:[
+        'Detailed cabinet-front cleaning & reachable trim',
+        'Detailed backsplash, grout, fixture buildup',
+        'Baseboards and door frames',
+        'Reachable light fixtures/fans',
+        'Intensive grease/buildup removal',
+        'Inside fridge/oven/cabinets (only if booked)'
+      ]},
+    { key:'bathrooms', num:3, title:'Bathroom(s)', sub:'Standard clean + deep-clean adds · add one per bathroom',
+      repeatable:true, instanceLabel:'Bathroom',
+      items:[
+        'Removed trash, replaced liner',
+        'Cleaned & disinfected toilet (exterior, seat, rim, bowl, base)',
+        'Cleaned vanity, sink, faucet, counter, backsplash',
+        'Cleaned mirrors streak-free',
+        'Cleaned tub/shower surfaces, fixtures, glass',
+        'Wiped shelving & exterior cabinetry',
+        'Spot-cleaned switches, handles, doors',
+        'Vacuumed/swept & mopped floor'
+      ],
+      deepItems:[
+        'Detailed grout/edge work & buildup removal',
+        'Baseboards, doors, frames, reachable vents/fixtures',
+        'Shower-door tracks & fixture buildup',
+        'Exterior cabinetry detailing',
+        'Extra time on soap scum / mineral residue'
+      ]},
+    { key:'bedrooms', num:4, title:'Bedroom(s)', sub:'One card per bedroom cleaned',
+      repeatable:true, instanceLabel:'Bedroom',
+      items:[
+        'Dusted reachable furniture & surfaces',
+        'Cleaned mirrors & accessible glass',
+        'Spot-cleaned switches, handles, doors',
+        'Made bed (if included)',
+        'Vacuumed carpet/edges; mopped hard flooring',
+        'Emptied trash, reset room neatly'
+      ]},
+    { key:'living', num:5, title:'Living / Dining / Office Areas', sub:'Common spaces',
+      items:[
+        'Dusted furniture, shelving, decor, lamps',
+        'Used caution around electronics — no direct spray',
+        'Cleaned mirrors/glass surfaces in scope',
+        'Straightened cushions & light decor only',
+        'Vacuumed upholstery (only if included)',
+        'Vacuumed/swept & mopped floor'
+      ]},
+    { key:'floors', num:6, title:'Floors — Whole Property', sub:'Final pass across all flooring types',
+      items:[
+        'Identified flooring type before chemicals/water',
+        'Vacuumed/swept thoroughly before mopping',
+        'Minimal moisture used on wood/laminate',
+        'No abrasive pads/unapproved chemicals on stone or specialty finishes',
+        'Floors free of visible debris, hair, mop streaks'
+      ]},
+    { key:'walkthrough', num:7, title:'Final Walkthrough', sub:'Before leaving the property',
+      items:[
+        'Kitchen counters/sink/stovetop visually clean & reset',
+        'Bathroom mirrors, fixtures, toilet, floors checked',
+        'No visible debris/hair in floor edges or corners',
+        'Trash removed, liners replaced',
+        'Belongings returned to original position',
+        'Lights, fans, thermostat, doors, windows, locks set per instructions',
+        'All supplies/tools/wet cloths removed — nothing left behind',
+        'Any damage or unusual condition documented & reported'
+      ]}
+  ];
+
+  /* ---------------- Supabase config ---------------- */
+  const SUPABASE_URL = 'https://qbicdeyirtvavlkrarcy.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_pvN11J0EDjEVsuCvXHVung_3Eh2VjVj';
+  const SESSION_KEY = 'one18_session';
+
+  let session = null; // {access_token, refresh_token, expires_at, email}
+
+  function authHeaders(){
+    return {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${session ? session.access_token : SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  function saveSession(s){
+    session = s;
+    try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){}
+  }
+  function clearSession(){
+    session = null;
+    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  }
+  function loadStoredSession(){
+    try{
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function sessionFromAuthResponse(body, fallbackEmail){
+    return {
+      access_token: body.access_token,
+      refresh_token: body.refresh_token,
+      expires_at: Date.now() + (body.expires_in*1000),
+      email: (body.user && body.user.email) || fallbackEmail
+    };
+  }
+  async function signIn(email, password){
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method:'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const body = await res.json();
+    if(!res.ok) throw new Error(body.error_description || body.msg || 'Login failed');
+    const s = sessionFromAuthResponse(body, email);
+    saveSession(s);
+    return s;
+  }
+  async function refreshSession(s){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method:'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type':'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token })
+      });
+      if(!res.ok) return null;
+      const body = await res.json();
+      const ns = sessionFromAuthResponse(body, s.email);
+      saveSession(ns);
+      return ns;
+    }catch(e){ return null; }
+  }
+  async function ensureSession(){
+    let s = loadStoredSession();
+    if(!s) return null;
+    if(s.expires_at - Date.now() < 60000){
+      s = await refreshSession(s);
+    }
+    if(s) session = s;
+    return s;
+  }
+
+  let jobsIndex = [];
+  let current = null; // full job object in memory
+  let detailsOpen = false;
+
+  const $ = id => document.getElementById(id);
+  const toastEl = $('toast');
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>toastEl.classList.remove('show'), 1600);
+  }
+
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+  /* ---------------- Storage helpers (Supabase) ---------------- */
+  async function loadJobsIndex(){
+    try{
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at&order=updated_at.desc`,
+        { headers: authHeaders() }
+      );
+      if(!res.ok) throw new Error(`List failed: ${res.status}`);
+      const rows = await res.json();
+      jobsIndex = rows.map(r => ({
+        id: r.id,
+        name: (r.data && r.data.name) || '',
+        updatedAt: new Date(r.updated_at).getTime(),
+        pct: r.data ? computePctForJob(r.data).pct : 0
+      }));
+    }catch(e){ console.error('Could not load jobs list', e); jobsIndex = []; toast('Could not reach the server'); }
+  }
+  async function loadJob(id){
+    try{
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=data`,
+        { headers: authHeaders() }
+      );
+      if(!res.ok) throw new Error(`Load failed: ${res.status}`);
+      const rows = await res.json();
+      return rows.length ? rows[0].data : null;
+    }catch(e){ console.error('Could not load job', e); toast('Could not reach the server'); return null; }
+  }
+  let saveTimer = null;
+  function scheduleSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveCurrent, 350);
+  }
+  async function saveCurrent(){
+    if(!current) return;
+    current.updatedAt = Date.now();
+    if(!current.createdBy && session) current.createdBy = session.email;
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({
+          id: current.id,
+          data: current,
+          status: current.status || 'in_progress',
+          submitted_at: current.submittedAt ? new Date(current.submittedAt).toISOString() : null,
+          created_by: current.createdBy || null,
+          updated_at: new Date(current.updatedAt).toISOString()
+        })
+      });
+      if(!res.ok) throw new Error(`Save failed: ${res.status}`);
+      const idx = jobsIndex.find(j=>j.id===current.id);
+      if(idx){
+        idx.name = current.name || 'Untitled job';
+        idx.updatedAt = current.updatedAt;
+        idx.pct = computeOverallPct().pct;
+        idx.status = current.status || 'in_progress';
+      }
+    }catch(e){ console.error('Save failed', e); toast('Could not save — check your connection'); }
+  }
+  async function deleteJobRemote(id){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+      if(!res.ok) throw new Error(`Delete failed: ${res.status}`);
+    }catch(e){ console.error('Delete failed', e); toast('Could not delete — check your connection'); }
+  }
+
+
+  /* ---------------- Job model ---------------- */
+  function blankItemState(items){
+    const o = {};
+    items.forEach((_,i)=> o[i]=false);
+    return o;
+  }
+  function newInstance(label){
+    return { id: uid(), label, items: blankItemState(sectionItemsFor('bathrooms')), photos: [] };
+  }
+  function sectionItemsFor(key){
+    const sec = SCHEMA.find(s=>s.key===key);
+    return sec.items;
+  }
+  function newJob(name){
+    const sections = {};
+    SCHEMA.forEach(sec=>{
+      if(sec.repeatable){
+        sections[sec.key] = [ { id: uid(), label: sec.instanceLabel+' 1', items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} } ];
+      } else {
+        sections[sec.key] = { items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} };
+      }
+    });
+    return {
+      id: uid(),
+      name: name || '',
+      client: '',
+      date: '',
+      address: '',
+      photo: null,
+      serviceLevel: 'standard',
+      safetyAcknowledged: false,
+      safetyAcknowledgedAt: null,
+      status: 'in_progress',
+      submittedAt: null,
+      createdBy: session ? session.email : null,
+      sections,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+
+  /* ---------------- Progress math ---------------- */
+  function sectionCounts(sec, state, job){
+    const deepOn = job.serviceLevel === 'deep' && sec.deepItems;
+    const total = sec.items.length + (deepOn ? sec.deepItems.length : 0);
+    let done = 0;
+    sec.items.forEach((_,i)=>{ if(state.items[i]) done++; });
+    if(deepOn){
+      sec.deepItems.forEach((_,i)=>{ if(state.items['d'+i]) done++; });
+    }
+    return {done, total};
+  }
+  function computePctForJob(job){
+    let done=0, total=0;
+    SCHEMA.forEach(sec=>{
+      if(sec.repeatable){
+        (job.sections[sec.key]||[]).forEach(inst=>{
+          const c = sectionCounts(sec, inst, job); done+=c.done; total+=c.total;
+        });
+      } else {
+        const c = sectionCounts(sec, job.sections[sec.key], job); done+=c.done; total+=c.total;
+      }
+    });
+    return { done, total, pct: total? Math.round(done/total*100) : 0 };
+  }
+  function computeOverallPct(){ return computePctForJob(current); }
+
+
+  /* ---------------- Rendering ---------------- */
+  const root = $('sectionsRoot');
+  let expandedKeys = new Set([SCHEMA[0].key]);
+
+  function render(){
+    if(!current) return;
+    $('jobNameInput').value = current.name || '';
+    $('clientInput').value = current.client || '';
+    $('dateInput').value = current.date || '';
+    $('addressInput').value = current.address || '';
+    $('jobMetaLine').textContent = current.client
+      ? `${current.client}${current.address ? ' · '+current.address : ''}`
+      : 'New job · tap "Job details" to add client & address';
+
+    renderPropertyPhotoRow();
+    renderSafetyGate();
+
+    document.querySelectorAll('#serviceToggle button').forEach(b=>{
+      b.classList.toggle('active', b.dataset.level === current.serviceLevel);
+    });
+
+    const overall = computeOverallPct();
+    $('progressPct').textContent = overall.pct + '% complete';
+    $('progressCount').textContent = `${overall.done} / ${overall.total} tasks`;
+    $('progressFill').style.width = overall.pct + '%';
+
+    root.innerHTML = '';
+    if(!current.safetyAcknowledged){
+      const locked = document.createElement('div');
+      locked.className = 'locked-msg';
+      locked.textContent = 'Review the chemical & surface DO NOT list above to unlock this job’s checklist.';
+      root.appendChild(locked);
+    } else {
+      SCHEMA.forEach(sec => root.appendChild(renderSection(sec)));
+    }
+    renderSubmitArea();
+  }
+
+  function renderSubmitArea(){
+    const area = $('submitArea');
+    area.innerHTML = '';
+    if(!current.safetyAcknowledged) return;
+
+    if(current.status === 'submitted'){
+      const banner = document.createElement('div');
+      banner.className = 'submit-banner';
+      const dt = current.submittedAt ? new Date(current.submittedAt).toLocaleString() : '';
+      banner.innerHTML = `<span>✓</span><span><strong>Job submitted</strong>${dt ? ' · '+dt : ''}</span>`;
+      const reopenBtn = document.createElement('button');
+      reopenBtn.className = 'reopen-btn';
+      reopenBtn.textContent = 'Reopen to edit';
+      reopenBtn.onclick = ()=>{
+        current.status = 'in_progress';
+        current.submittedAt = null;
+        scheduleSave(); render();
+      };
+      banner.appendChild(reopenBtn);
+      area.appendChild(banner);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'submit-job-btn';
+      btn.textContent = 'Submit Completed Job';
+      btn.onclick = ()=>{
+        if(!confirm('Submit this job as complete? You can reopen it later if you need to make changes.')) return;
+        current.status = 'submitted';
+        current.submittedAt = Date.now();
+        scheduleSave(); render();
+        toast('Job submitted to the office');
+      };
+      area.appendChild(btn);
+    }
+  }
+
+  function renderSafetyGate(){
+    const area = $('safetyGateArea');
+    area.innerHTML = '';
+    if(current.safetyAcknowledged){
+      const strip = document.createElement('div');
+      strip.className = 'safety-confirmed';
+      const dt = current.safetyAcknowledgedAt ? new Date(current.safetyAcknowledgedAt).toLocaleDateString() : '';
+      strip.innerHTML = `<span>✓</span><span><strong>DO NOT list reviewed</strong>${dt ? ' · '+dt : ''}</span>`;
+      const btn = document.createElement('button');
+      btn.textContent = 'View again';
+      btn.onclick = ()=> $('safetyModal').classList.add('open');
+      strip.appendChild(btn);
+      area.appendChild(strip);
+    } else {
+      const gate = document.createElement('div');
+      gate.className = 'safety-gate';
+      gate.innerHTML = `
+        <div class="safety-gate-icon">⚠</div>
+        <div class="safety-gate-text">
+          <strong>Chemical Safety Review Required</strong>
+          <span>Open and review the DO NOT list before starting this job.</span>
+        </div>
+      `;
+      const btn = document.createElement('button');
+      btn.className = 'safety-gate-btn';
+      btn.textContent = 'Open & Review';
+      btn.onclick = ()=> $('safetyModal').classList.add('open');
+      gate.appendChild(btn);
+      area.appendChild(gate);
+    }
+  }
+
+  function renderSection(sec){
+    const card = document.createElement('div');
+    card.className = 'section-card' + (expandedKeys.has(sec.key) ? ' expanded' : '');
+
+    if(sec.repeatable){
+      const instances = current.sections[sec.key];
+      let totalDone=0, totalCount=0;
+      instances.forEach(inst=>{ const c=sectionCounts(sec, inst, current); totalDone+=c.done; totalCount+=c.total; });
+      const complete = totalCount>0 && totalDone===totalCount;
+
+      card.appendChild(sectionHead(sec, totalDone, totalCount, complete));
+
+      const body = document.createElement('div');
+      body.className = 'section-body';
+      const inner = document.createElement('div');
+      inner.className = 'section-body-inner';
+      inner.style.padding = '0';
+
+      instances.forEach((inst, idx)=>{
+        const divider = document.createElement('div');
+        divider.className = 'instance-divider';
+        const c = sectionCounts(sec, inst, current);
+        divider.innerHTML = `<span>${escapeHtml(inst.label)} <span style="color:var(--slate); font-weight:400; text-transform:none;">(${c.done}/${c.total})</span></span>`;
+        if(instances.length > 1){
+          const rm = document.createElement('button');
+          rm.className = 'remove-instance-btn';
+          rm.textContent = 'Remove';
+          rm.onclick = ()=>{ instances.splice(idx,1); scheduleSave(); render(); };
+          divider.appendChild(rm);
+        }
+        inner.appendChild(divider);
+
+        const miniWrap = document.createElement('div');
+        miniWrap.className='mini-progress';
+        miniWrap.innerHTML = `<div style="width:${c.total? Math.round(c.done/c.total*100):0}%"></div>`;
+        inner.appendChild(miniWrap);
+
+        const listWrap = document.createElement('div');
+        listWrap.style.padding = '0 14px';
+        listWrap.appendChild(renderChecklist(sec, inst));
+        listWrap.appendChild(renderPhotoBlock(sec.key, inst));
+        inner.appendChild(listWrap);
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'repeat-actions';
+      actions.style.paddingBottom = '14px';
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-instance-btn';
+      addBtn.textContent = `+ Add another ${sec.instanceLabel.toLowerCase()}`;
+      addBtn.onclick = ()=>{
+        instances.push({ id: uid(), label: `${sec.instanceLabel} ${instances.length+1}`, items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} });
+        scheduleSave(); render();
+      };
+      actions.appendChild(addBtn);
+      inner.appendChild(actions);
+
+      body.appendChild(inner);
+      card.appendChild(body);
+    } else {
+      const state = current.sections[sec.key];
+      const c = sectionCounts(sec, state, current);
+      const complete = c.total>0 && c.done===c.total;
+      card.appendChild(sectionHead(sec, c.done, c.total, complete));
+
+      const body = document.createElement('div');
+      body.className = 'section-body';
+      const miniWrap = document.createElement('div');
+      miniWrap.className='mini-progress';
+      miniWrap.innerHTML = `<div style="width:${c.total? Math.round(c.done/c.total*100):0}%"></div>`;
+      body.appendChild(miniWrap);
+
+      const inner = document.createElement('div');
+      inner.className = 'section-body-inner';
+      inner.appendChild(renderChecklist(sec, state));
+      inner.appendChild(renderPhotoBlock(sec.key, state));
+      body.appendChild(inner);
+      card.appendChild(body);
+    }
+
+    return card;
+  }
+
+  function sectionHead(sec, done, total, complete){
+    const head = document.createElement('div');
+    head.className = 'section-head';
+    head.innerHTML = `
+      <div class="section-num">${sec.num}</div>
+      <div class="section-titles">
+        <h2>${escapeHtml(sec.title)}</h2>
+        <div class="section-sub">${escapeHtml(sec.sub)} · ${done}/${total}</div>
+      </div>
+      ${complete ? '<div class="section-stamp">Complete</div>' : ''}
+      <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    `;
+    head.onclick = ()=>{
+      if(expandedKeys.has(sec.key)) expandedKeys.delete(sec.key); else expandedKeys.add(sec.key);
+      render();
+    };
+    return head;
+  }
+
+  function renderChecklist(sec, state) {
+    const wrap = document.createElement('div');
+    sec.items.forEach((text, i)=>{
+      const hasPhotoOption = sec.itemPhotoIndices && sec.itemPhotoIndices.includes(i);
+      wrap.appendChild(checkRow(text, !!state.items[i], (checked)=>{
+        state.items[i] = checked; scheduleSave(); render();
+      }));
+      if(hasPhotoOption){
+        wrap.appendChild(renderItemPhotoStrip(state, i));
+      }
+    });
+    if(current.serviceLevel === 'deep' && sec.deepItems){
+      sec.deepItems.forEach((text, i)=>{
+        const key = 'd'+i;
+        wrap.appendChild(checkRow(text, !!state.items[key], (checked)=>{
+          state.items[key] = checked; scheduleSave(); render();
+        }, true));
+      });
+    }
+    return wrap;
+  }
+
+  function renderItemPhotoStrip(state, itemIndex){
+    state.itemPhotos = state.itemPhotos || {};
+    state.itemNotes = state.itemNotes || {};
+    const photos = state.itemPhotos[itemIndex] || [];
+    const strip = document.createElement('div');
+    strip.className = 'item-photo-strip';
+
+    const noteLabel = document.createElement('div');
+    noteLabel.className = 'item-note-label';
+    noteLabel.textContent = 'Describe the damage / condition';
+    strip.appendChild(noteLabel);
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'item-note-textarea';
+    textarea.placeholder = 'e.g. Scuff on hallway baseboard, roughly 3 inches, appeared pre-existing...';
+    textarea.value = state.itemNotes[itemIndex] || '';
+    textarea.addEventListener('input', (e)=>{
+      state.itemNotes[itemIndex] = e.target.value;
+      scheduleSave();
+    });
+    strip.appendChild(textarea);
+
+    const photoLabel = document.createElement('div');
+    photoLabel.className = 'item-photo-label';
+    photoLabel.textContent = 'Damage / condition photos' + (photos.length ? ' · '+photos.length : '');
+    strip.appendChild(photoLabel);
+
+    const grid = document.createElement('div');
+    grid.className = 'photo-grid';
+
+    photos.forEach((src, idx)=>{
+      const thumb = document.createElement('div');
+      thumb.className = 'photo-thumb photo-thumb-sm';
+      thumb.innerHTML = `<img src="${src}" alt="Condition photo"><button class="rm">✕</button>`;
+      thumb.querySelector('img').onclick = ()=> openLightbox(src);
+      thumb.querySelector('.rm').onclick = (e)=>{
+        e.stopPropagation();
+        state.itemPhotos[itemIndex].splice(idx,1);
+        scheduleSave(); render();
+      };
+      grid.appendChild(thumb);
+    });
+
+    const addTile = document.createElement('label');
+    addTile.className = 'add-photo add-photo-sm';
+    addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.multiple = true;
+    input.style.display = 'none';
+    input.addEventListener('change', async (e)=>{
+      const files = Array.from(e.target.files || []);
+      for(const f of files){
+        try{
+          const dataUrl = await compressImage(f);
+          state.itemPhotos[itemIndex] = state.itemPhotos[itemIndex] || [];
+          state.itemPhotos[itemIndex].push(dataUrl);
+        }catch(err){ console.error(err); toast('Could not add that photo'); }
+      }
+      scheduleSave(); render();
+    });
+    addTile.appendChild(input);
+    grid.appendChild(addTile);
+
+    strip.appendChild(grid);
+    return strip;
+  }
+
+  function checkRow(text, checked, onChange, isDeep){
+    const row = document.createElement('div');
+    row.className = 'check-item' + (checked ? ' done' : '');
+    const id = 'chk_' + uid();
+    row.innerHTML = `
+      <input type="checkbox" id="${id}" ${checked?'checked':''}>
+      <label for="${id}">${escapeHtml(text)}${isDeep ? '<span class="deep-flag">DEEP</span>' : ''}</label>
+    `;
+    row.querySelector('input').addEventListener('change', e => onChange(e.target.checked));
+    return row;
+  }
+
+  function renderPhotoBlock(sectionKey, state){
+    const block = document.createElement('div');
+    block.className = 'photo-block';
+    block.innerHTML = `<div class="photo-label"><span>Photos</span><span>${(state.photos||[]).length} added</span></div>`;
+    const grid = document.createElement('div');
+    grid.className = 'photo-grid';
+
+    (state.photos||[]).forEach((src, idx)=>{
+      const thumb = document.createElement('div');
+      thumb.className = 'photo-thumb';
+      thumb.innerHTML = `<img src="${src}" alt="Job photo"><button class="rm">✕</button>`;
+      thumb.querySelector('img').onclick = ()=> openLightbox(src);
+      thumb.querySelector('.rm').onclick = (e)=>{
+        e.stopPropagation();
+        state.photos.splice(idx,1);
+        scheduleSave(); render();
+      };
+      grid.appendChild(thumb);
+    });
+
+    const addTile = document.createElement('label');
+    addTile.className = 'add-photo';
+    addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.multiple = true;
+    input.style.display = 'none';
+    input.addEventListener('change', async (e)=>{
+      const files = Array.from(e.target.files || []);
+      for(const f of files){
+        try{
+          const dataUrl = await compressImage(f);
+          state.photos = state.photos || [];
+          state.photos.push(dataUrl);
+        }catch(err){ console.error(err); toast('Could not add that photo'); }
+      }
+      scheduleSave(); render();
+    });
+    addTile.appendChild(input);
+    grid.appendChild(addTile);
+
+    block.appendChild(grid);
+    return block;
+  }
+
+  function renderPropertyPhotoRow(){
+    const row = $('propertyPhotoRow');
+    row.innerHTML = '';
+
+    if(current.photo){
+      const thumb = document.createElement('div');
+      thumb.className = 'property-photo-thumb';
+      thumb.innerHTML = `<img src="${current.photo}" alt="Property photo"><button class="rm">✕</button>`;
+      thumb.querySelector('img').onclick = ()=> openLightbox(current.photo);
+      thumb.querySelector('.rm').onclick = (e)=>{
+        e.stopPropagation();
+        current.photo = null;
+        scheduleSave(); render();
+      };
+      row.appendChild(thumb);
+      const text = document.createElement('div');
+      text.className = 'property-photo-text';
+      text.innerHTML = `<strong>Property photo added</strong>Tap to view, or the ✕ to replace`;
+      row.appendChild(text);
+    } else {
+      const addTile = document.createElement('label');
+      addTile.className = 'property-photo-add';
+      addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+      input.style.display = 'none';
+      input.addEventListener('change', async (e)=>{
+        const file = (e.target.files || [])[0];
+        if(!file) return;
+        try{
+          current.photo = await compressImage(file);
+          scheduleSave(); render();
+        }catch(err){ console.error(err); toast('Could not add that photo'); }
+      });
+      addTile.appendChild(input);
+      row.appendChild(addTile);
+      const text = document.createElement('div');
+      text.className = 'property-photo-text';
+      text.innerHTML = `<strong>Add a property photo</strong>Helps identify the job at a glance`;
+      row.appendChild(text);
+    }
+  }
+
+  function compressImage(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const maxDim = 900;
+          let {width, height} = img;
+          if(width > height && width > maxDim){ height = Math.round(height * maxDim/width); width = maxDim; }
+          else if(height > maxDim){ width = Math.round(width * maxDim/height); height = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openLightbox(src){
+    $('lightboxImg').src = src;
+    $('lightbox').classList.add('open');
+  }
+  $('lightboxClose').onclick = ()=> $('lightbox').classList.remove('open');
+  $('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') $('lightbox').classList.remove('open'); });
+
+  $('safetyCloseX').onclick = ()=> $('safetyModal').classList.remove('open');
+  $('safetyModal').addEventListener('click', e=>{ if(e.target.id==='safetyModal') $('safetyModal').classList.remove('open'); });
+  $('safetyAckBtn').onclick = ()=>{
+    current.safetyAcknowledged = true;
+    current.safetyAcknowledgedAt = Date.now();
+    scheduleSave();
+    $('safetyModal').classList.remove('open');
+    render();
+    toast('Safety list reviewed — checklist unlocked');
+  };
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /* ---------------- Top-level controls ---------------- */
+  $('jobNameInput').addEventListener('input', e=>{ current.name = e.target.value; scheduleSave(); });
+  $('clientInput').addEventListener('input', e=>{ current.client = e.target.value; scheduleSave(); render(); });
+  $('dateInput').addEventListener('input', e=>{ current.date = e.target.value; scheduleSave(); });
+  $('addressInput').addEventListener('input', e=>{ current.address = e.target.value; scheduleSave(); render(); });
+
+  $('toggleDetailsBtn').onclick = ()=>{
+    detailsOpen = !detailsOpen;
+    $('detailsPanel').classList.toggle('open', detailsOpen);
+    $('toggleDetailsBtn').textContent = 'Job details ' + (detailsOpen ? '▴' : '▾');
+  };
+
+  document.querySelectorAll('#serviceToggle button').forEach(btn=>{
+    btn.onclick = ()=>{ current.serviceLevel = btn.dataset.level; scheduleSave(); render(); };
+  });
+
+  /* ---------------- Job switcher ---------------- */
+  $('switchJobsBtn').onclick = openSwitcher;
+  $('closeSwitcherBtn').onclick = ()=> $('switcherOverlay').classList.remove('open');
+  $('switcherOverlay').addEventListener('click', e=>{ if(e.target.id==='switcherOverlay') $('switcherOverlay').classList.remove('open'); });
+
+  function openSwitcher(){
+    const list = $('jobList');
+    list.innerHTML = '';
+    if(jobsIndex.length === 0){
+      list.innerHTML = '<p style="color:var(--slate); font-size:13px;">No saved jobs yet.</p>';
+    }
+    jobsIndex.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(j=>{
+      const row = document.createElement('div');
+      row.className = 'job-item';
+      const dt = new Date(j.updatedAt);
+      row.innerHTML = `
+        <div class="info">
+          <div class="jname">${escapeHtml(j.name || 'Untitled job')}</div>
+          <div class="jmeta">Updated ${dt.toLocaleDateString()} · <button class="del-job">Delete</button></div>
+        </div>
+        <div class="pct">${j.pct||0}%</div>
+      `;
+      row.querySelector('.info').addEventListener('click', async (e)=>{
+        if(e.target.classList.contains('del-job')) return;
+        await switchToJob(j.id);
+        $('switcherOverlay').classList.remove('open');
+      });
+      row.querySelector('.del-job').addEventListener('click', async (e)=>{
+        e.stopPropagation();
+        if(!confirm(`Delete "${j.name || 'Untitled job'}"? This can't be undone.`)) return;
+        await deleteJobRemote(j.id);
+        jobsIndex = jobsIndex.filter(x=>x.id!==j.id);
+        if(current && current.id===j.id){
+          if(jobsIndex.length){ await switchToJob(jobsIndex[0].id); }
+          else { await startNewJob(); }
+        }
+        openSwitcher();
+      });
+      list.appendChild(row);
+    });
+    $('switcherOverlay').classList.add('open');
+  }
+
+  $('newJobBtn').onclick = async ()=>{
+    await startNewJob();
+    $('switcherOverlay').classList.remove('open');
+  };
+
+  async function switchToJob(id){
+    const job = await loadJob(id);
+    if(job){ current = job; expandedKeys = new Set([SCHEMA[0].key]); render(); toast('Job loaded'); }
+  }
+
+  async function startNewJob(){
+    current = newJob('');
+    jobsIndex.push({ id: current.id, name: '', updatedAt: current.updatedAt, pct: 0 });
+    await saveCurrent();
+    expandedKeys = new Set([SCHEMA[0].key]);
+    render();
+    $('jobNameInput').focus();
+  }
+
+  /* ---------------- Boot ---------------- */
+  async function boot(){
+    await loadJobsIndex();
+    if(jobsIndex.length){
+      const mostRecent = jobsIndex.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+      const job = await loadJob(mostRecent.id);
+      current = job || newJob('');
+    } else {
+      current = newJob('');
+      await saveCurrent();
+      jobsIndex.push({ id: current.id, name:'', updatedAt: current.updatedAt, pct: 0 });
+    }
+    render();
+  }
+
+  function showLoginError(msg){
+    const el = $('loginError');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  $('loginBtn').onclick = async ()=>{
+    const email = $('loginEmail').value.trim();
+    const password = $('loginPassword').value;
+    $('loginError').classList.remove('show');
+    if(!email || !password){ showLoginError('Enter your email and password'); return; }
+    $('loginBtn').disabled = true;
+    $('loginBtn').textContent = 'Signing in…';
+    try{
+      await signIn(email, password);
+      $('loginGate').classList.remove('open');
+      await boot();
+    }catch(e){
+      showLoginError(e.message || 'Could not sign in. Check your email and password.');
+    }finally{
+      $('loginBtn').disabled = false;
+      $('loginBtn').textContent = 'Log In';
+    }
+  };
+  $('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') $('loginBtn').click(); });
+
+  $('logoutBtn').onclick = ()=>{
+    if(!confirm('Log out?')) return;
+    clearSession();
+    location.reload();
+  };
+
+  (async function init(){
+    const s = await ensureSession();
+    if(s){
+      session = s;
+      $('loginGate').classList.remove('open');
+      await boot();
+    } else {
+      $('loginGate').classList.add('open');
+    }
+  })();
+
+})();
+</script>
+</body>
+</html>
