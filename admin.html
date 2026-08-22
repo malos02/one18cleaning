@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>One:18 — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16283F; --navy-2:#1F3454; --gold:#C79A5D; --gold-light:#E7CE9F;
+    --cream:#FAF6EE; --paper:#FFFFFF; --ink:#20303F; --slate:#6B7A8C; --line:#E4DCCB;
+    --green:#4B7A5E; --green-bg:#EAF2ED; --red:#B5493B; --red-bg:#FBECE9; --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--cream); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.display{font-family:'Fraunces',Georgia,serif; font-weight:600; letter-spacing:-0.01em;}
+  button{font-family:inherit; cursor:pointer;}
+
+  .topbar{
+    background:var(--navy); color:#fff; padding:16px 18px;
+    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:30;
+    box-shadow:0 6px 16px rgba(22,40,63,0.18);
+  }
+  .seal{width:34px; height:34px; border-radius:50%; border:1.5px solid var(--gold-light); display:flex; align-items:center; justify-content:center; flex:none;}
+  .seal::before{content:"✦"; color:var(--gold-light); font-size:14px;}
+  .brand{flex:1; min-width:0;}
+  .brand .name{font-family:'Fraunces',serif; font-size:16px; font-weight:600;}
+  .brand .tag{font-size:10.5px; color:var(--gold-light); letter-spacing:0.08em; text-transform:uppercase;}
+  .icon-btn{background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:#fff; border-radius:10px; padding:8px 12px; font-size:12.5px;}
+
+  main{max-width:900px; margin:0 auto; padding:18px 16px 60px;}
+
+  /* login */
+  .login-gate{position:fixed; inset:0; background:var(--navy); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .login-gate.hidden{display:none;}
+  .login-card{background:var(--paper); width:100%; max-width:340px; border-radius:16px; padding:26px 22px; text-align:center;}
+  .login-seal{width:44px; height:44px; border-radius:50%; border:1.5px solid var(--gold); margin:0 auto 14px; display:flex; align-items:center; justify-content:center;}
+  .login-seal::before{content:"✦"; color:var(--gold); font-size:18px;}
+  .login-card h2{margin:0 0 4px; font-size:19px; color:var(--navy);}
+  .login-sub{font-size:12.5px; color:var(--slate); margin:0 0 18px;}
+  .login-field{text-align:left; margin-bottom:12px;}
+  .login-field label{display:block; font-size:10.5px; color:var(--slate); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;}
+  .login-field input{width:100%; border:1.3px solid var(--line); border-radius:9px; padding:10px 11px; font-size:14px; outline:none; background:#FCFAF4;}
+  .login-error{display:none; background:var(--red-bg); color:var(--red); font-size:12px; border-radius:8px; padding:8px 10px; margin-bottom:12px; text-align:left;}
+  .login-error.show{display:block;}
+  .login-btn{width:100%; background:var(--navy); color:#fff; border:none; border-radius:10px; padding:12px; font-size:14px; font-weight:700;}
+  .login-btn:disabled{opacity:0.6;}
+  .not-admin{color:var(--red); font-size:12.5px; margin-top:10px;}
+
+  /* filters */
+  .filter-row{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .filter-row input, .filter-row select{
+    border:1.3px solid var(--line); border-radius:9px; padding:9px 11px; font-size:13.5px; background:var(--paper); outline:none;
+  }
+  .filter-row input{flex:1; min-width:160px;}
+
+  /* job list */
+  .job-card{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px; margin-bottom:10px; cursor:pointer; display:flex; gap:12px; align-items:center;
+  }
+  .job-card:hover{border-color:var(--gold);}
+  .job-thumb{width:52px; height:52px; border-radius:10px; object-fit:cover; flex:none; background:var(--line);}
+  .job-thumb-placeholder{
+    width:52px; height:52px; border-radius:10px; flex:none; background:var(--cream); border:1px dashed var(--line);
+    display:flex; align-items:center; justify-content:center; color:var(--slate); font-size:18px;
+  }
+  .job-info{flex:1; min-width:0;}
+  .job-info .jn{font-weight:600; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .job-info .jm{font-size:12px; color:var(--slate); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .job-side{text-align:right; flex:none;}
+  .pct{font-family:'Fraunces',serif; font-size:15px; color:var(--gold);}
+  .status-pill{
+    display:inline-block; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;
+    padding:2px 8px; border-radius:20px; margin-top:4px;
+  }
+  .status-pill.submitted{background:var(--green-bg); color:var(--green); border:1px solid var(--green);}
+  .status-pill.in_progress{background:var(--cream); color:var(--slate); border:1px solid var(--line);}
+
+  .empty-msg{text-align:center; color:var(--slate); padding:40px 20px; font-size:13.5px;}
+
+  /* detail view */
+  .detail-overlay{position:fixed; inset:0; background:var(--cream); z-index:50; overflow-y:auto; display:none;}
+  .detail-overlay.open{display:block;}
+  .detail-top{background:var(--navy); color:#fff; padding:16px 18px; position:sticky; top:0; z-index:5;}
+  .detail-top .back{background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:9px; padding:7px 12px; font-size:12.5px; margin-bottom:10px;}
+  .detail-top h2{margin:0; font-size:19px;}
+  .detail-top .sub{font-size:12px; color:rgba(255,255,255,0.65); margin-top:3px;}
+  .detail-body{max-width:700px; margin:0 auto; padding:16px 16px 60px;}
+
+  .detail-hero{width:100%; max-height:220px; object-fit:cover; border-radius:14px; margin-bottom:14px; display:block;}
+  .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+  .info-box{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:10px 12px;}
+  .info-box label{display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--slate); margin-bottom:3px;}
+  .info-box div{font-size:13.5px; font-weight:600;}
+
+  .sec-card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:12px;}
+  .sec-card h3{margin:0 0 2px; font-size:15px;}
+  .sec-frac{font-size:12px; color:var(--slate); margin-bottom:10px;}
+  .item-row{display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:13.5px; border-bottom:1px solid #F1EDE2;}
+  .item-row:last-child{border-bottom:none;}
+  .item-row .tick{flex:none; width:16px; text-align:center;}
+  .item-row.done{color:var(--slate);}
+  .item-row.done .tick{color:var(--green);}
+  .item-row:not(.done) .tick{color:var(--line);}
+  .item-note{background:var(--red-bg); border-radius:8px; padding:8px 10px; font-size:12.5px; color:#7A392F; margin:6px 0 6px 24px;}
+  .item-photos{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px 24px;}
+  .item-photos img{width:56px; height:56px; border-radius:7px; object-fit:cover; cursor:pointer; border:1px solid var(--line);}
+  .sec-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);}
+  .sec-photos img{width:64px; height:64px; border-radius:8px; object-fit:cover; cursor:pointer; border:1px solid var(--line);}
+  .instance-label{font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:0.04em; margin:10px 0 4px;}
+
+  .lightbox{position:fixed; inset:0; background:rgba(10,16,24,0.9); z-index:90; display:none; align-items:center; justify-content:center; padding:20px;}
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%; max-height:85vh; border-radius:10px;}
+  .lightbox-close{position:absolute; top:18px; right:18px; background:rgba(255,255,255,0.15); color:#fff; border:none; width:36px; height:36px; border-radius:50%; font-size:18px;}
+</style>
+</head>
+<body>
+
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="login-seal"></div>
+    <h2>One:18 Admin</h2>
+    <p class="login-sub">Sign in to view job records</p>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" autocomplete="username" placeholder="you@example.com">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-btn" id="loginBtn">Log In</button>
+    <div class="not-admin" id="notAdminMsg" style="display:none;">This account isn't set up for admin access.</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="seal"></div>
+  <div class="brand">
+    <div class="name">One:18 Cleaning</div>
+    <div class="tag">Admin Dashboard</div>
+  </div>
+  <button class="icon-btn" id="logoutBtn">Log out</button>
+</div>
+
+<main>
+  <div class="filter-row">
+    <input type="text" id="searchInput" placeholder="Search by job name, client, or address...">
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option value="submitted">Submitted</option>
+      <option value="in_progress">In progress</option>
+    </select>
+  </div>
+  <div id="jobListArea"></div>
+</main>
+
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-top">
+    <button class="back" id="backBtn">← All jobs</button>
+    <h2 id="detailTitle">Job</h2>
+    <div class="sub" id="detailSub"></div>
+  </div>
+  <div class="detail-body" id="detailBody"></div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="" alt="Job photo">
+</div>
+
+<script>
+(function(){
+
+  const SUPABASE_URL = 'https://qbicdeyirtvavlkrarcy.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_pvN11J0EDjEVsuCvXHVung_3Eh2VjVj';
+  const ADMIN_EMAILS = ['one18cleaning@gmail.com'];
+  const SESSION_KEY = 'one18_admin_session';
+
+  let session = null;
+  let allJobs = []; // [{id, data, status, submitted_at, created_by, updated_at}]
+
+  const $ = id => document.getElementById(id);
+
+  /* ---------------- Section schema (must mirror the contractor app) ---------------- */
+  const SCHEMA = [
+    { key:'arrival', num:1, title:'Arrival & Property Entry',
+      items:['Parked legally, not blocking access','Used approved entry method only','Completed brief visual walkthrough','Documented pre-existing damage / unusual conditions','Verified client-requested priorities in scope','Exterior doors secured while working'],
+      itemPhotoIndices:[3]},
+    { key:'kitchen', num:2, title:'Kitchen',
+      items:['Removed trash, replaced liner','Dusted/wiped surfaces & cabinet fronts','Cleaned & sanitized counters and backsplash','Cleaned sink, faucet, drain area, fixtures','Wiped exterior of fridge, dishwasher, oven, microwave','Cleaned stovetop','Cleaned microwave interior (if in scope)','Spot-cleaned switches, handles, doors','Vacuumed/swept & mopped floor, including edges'],
+      deepItems:['Detailed cabinet-front cleaning & reachable trim','Detailed backsplash, grout, fixture buildup','Baseboards and door frames','Reachable light fixtures/fans','Intensive grease/buildup removal','Inside fridge/oven/cabinets (only if booked)']},
+    { key:'bathrooms', num:3, title:'Bathroom(s)', repeatable:true, instanceLabel:'Bathroom',
+      items:['Removed trash, replaced liner','Cleaned & disinfected toilet (exterior, seat, rim, bowl, base)','Cleaned vanity, sink, faucet, counter, backsplash','Cleaned mirrors streak-free','Cleaned tub/shower surfaces, fixtures, glass','Wiped shelving & exterior cabinetry','Spot-cleaned switches, handles, doors','Vacuumed/swept & mopped floor'],
+      deepItems:['Detailed grout/edge work & buildup removal','Baseboards, doors, frames, reachable vents/fixtures','Shower-door tracks & fixture buildup','Exterior cabinetry detailing','Extra time on soap scum / mineral residue']},
+    { key:'bedrooms', num:4, title:'Bedroom(s)', repeatable:true, instanceLabel:'Bedroom',
+      items:['Dusted reachable furniture & surfaces','Cleaned mirrors & accessible glass','Spot-cleaned switches, handles, doors','Made bed (if included)','Vacuumed carpet/edges; mopped hard flooring','Emptied trash, reset room neatly']},
+    { key:'living', num:5, title:'Living / Dining / Office Areas',
+      items:['Dusted furniture, shelving, decor, lamps','Used caution around electronics — no direct spray','Cleaned mirrors/glass surfaces in scope','Straightened cushions & light decor only','Vacuumed upholstery (only if included)','Vacuumed/swept & mopped floor']},
+    { key:'floors', num:6, title:'Floors — Whole Property',
+      items:['Identified flooring type before chemicals/water','Vacuumed/swept thoroughly before mopping','Minimal moisture used on wood/laminate','No abrasive pads/unapproved chemicals on stone or specialty finishes','Floors free of visible debris, hair, mop streaks']},
+    { key:'walkthrough', num:7, title:'Final Walkthrough',
+      items:['Kitchen counters/sink/stovetop visually clean & reset','Bathroom mirrors, fixtures, toilet, floors checked','No visible debris/hair in floor edges or corners','Trash removed, liners replaced','Belongings returned to original position','Lights, fans, thermostat, doors, windows, locks set per instructions','All supplies/tools/wet cloths removed — nothing left behind','Any damage or unusual condition documented & reported']}
+  ];
+
+  function sectionCounts(sec, state, job){
+    const deepOn = job.serviceLevel === 'deep' && sec.deepItems;
+    const total = sec.items.length + (deepOn ? sec.deepItems.length : 0);
+    let done = 0;
+    sec.items.forEach((_,i)=>{ if(state.items && state.items[i]) done++; });
+    if(deepOn){ sec.deepItems.forEach((_,i)=>{ if(state.items && state.items['d'+i]) done++; }); }
+    return {done, total};
+  }
+  function computePctForJob(job){
+    let done=0, total=0;
+    SCHEMA.forEach(sec=>{
+      if(sec.repeatable){
+        (job.sections && job.sections[sec.key] || []).forEach(inst=>{
+          const c = sectionCounts(sec, inst, job); done+=c.done; total+=c.total;
+        });
+      } else if(job.sections && job.sections[sec.key]){
+        const c = sectionCounts(sec, job.sections[sec.key], job); done+=c.done; total+=c.total;
+      }
+    });
+    return total ? Math.round(done/total*100) : 0;
+  }
+
+  /* ---------------- Auth ---------------- */
+  function authHeaders(){
+    return { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${session ? session.access_token : SUPABASE_KEY}`, 'Content-Type':'application/json' };
+  }
+  function saveSession(s){ session = s; try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+  function clearSession(){ session = null; try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
+  function loadStoredSession(){ try{ const r = localStorage.getItem(SESSION_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+  function sessionFromAuthResponse(body, fallbackEmail){
+    return { access_token: body.access_token, refresh_token: body.refresh_token, expires_at: Date.now() + body.expires_in*1000, email: (body.user && body.user.email) || fallbackEmail };
+  }
+  async function signIn(email, password){
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method:'POST', headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'}, body: JSON.stringify({email,password})
+    });
+    const body = await res.json();
+    if(!res.ok) throw new Error(body.error_description || body.msg || 'Login failed');
+    const s = sessionFromAuthResponse(body, email);
+    saveSession(s);
+    return s;
+  }
+  async function refreshSession(s){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method:'POST', headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'}, body: JSON.stringify({refresh_token:s.refresh_token})
+      });
+      if(!res.ok) return null;
+      const body = await res.json();
+      const ns = sessionFromAuthResponse(body, s.email);
+      saveSession(ns);
+      return ns;
+    }catch(e){ return null; }
+  }
+  async function ensureSession(){
+    let s = loadStoredSession();
+    if(!s) return null;
+    if(s.expires_at - Date.now() < 60000){ s = await refreshSession(s); }
+    if(s) session = s;
+    return s;
+  }
+  function isAdmin(){ return session && ADMIN_EMAILS.includes((session.email||'').toLowerCase()); }
+
+  /* ---------------- Data ---------------- */
+  async function loadAllJobs(){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,submitted_at,created_by,updated_at&order=updated_at.desc`, { headers: authHeaders() });
+      if(!res.ok) throw new Error('Load failed: '+res.status);
+      allJobs = await res.json();
+    }catch(e){ console.error(e); allJobs = []; }
+  }
+
+  /* ---------------- List rendering ---------------- */
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function renderList(){
+    const q = $('searchInput').value.trim().toLowerCase();
+    const statusF = $('statusFilter').value;
+    const area = $('jobListArea');
+    area.innerHTML = '';
+
+    let filtered = allJobs.filter(j=>{
+      const d = j.data || {};
+      if(statusF && j.status !== statusF) return false;
+      if(q){
+        const hay = `${d.name||''} ${d.client||''} ${d.address||''}`.toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    if(filtered.length === 0){
+      area.innerHTML = '<div class="empty-msg">No jobs match.</div>';
+      return;
+    }
+
+    filtered.forEach(j=>{
+      const d = j.data || {};
+      const pct = computePctForJob(d);
+      const card = document.createElement('div');
+      card.className = 'job-card';
+      const thumbHtml = d.photo
+        ? `<img class="job-thumb" src="${d.photo}" alt="">`
+        : `<div class="job-thumb-placeholder">🏠</div>`;
+      card.innerHTML = `
+        ${thumbHtml}
+        <div class="job-info">
+          <div class="jn">${escapeHtml(d.name || 'Untitled job')}</div>
+          <div class="jm">${escapeHtml(d.client || 'No client name')}${d.address ? ' · '+escapeHtml(d.address) : ''}</div>
+          <div class="jm">${j.created_by ? 'By '+escapeHtml(j.created_by) : ''}</div>
+        </div>
+        <div class="job-side">
+          <div class="pct">${pct}%</div>
+          <div class="status-pill ${j.status}">${j.status === 'submitted' ? 'Submitted' : 'In progress'}</div>
+        </div>
+      `;
+      card.onclick = ()=> openDetail(j);
+      area.appendChild(card);
+    });
+  }
+
+  /* ---------------- Detail rendering ---------------- */
+  function openDetail(j){
+    const d = j.data || {};
+    $('detailTitle').textContent = d.name || 'Untitled job';
+    const dt = j.updated_at ? new Date(j.updated_at).toLocaleString() : '';
+    $('detailSub').textContent = `${j.created_by ? j.created_by+' · ' : ''}${j.status === 'submitted' ? 'Submitted' : 'In progress'}${dt ? ' · Updated '+dt : ''}`;
+
+    const body = $('detailBody');
+    body.innerHTML = '';
+
+    if(d.photo){
+      const img = document.createElement('img');
+      img.className = 'detail-hero'; img.src = d.photo; img.alt = 'Property photo';
+      img.onclick = ()=> openLightbox(d.photo);
+      body.appendChild(img);
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'info-grid';
+    grid.innerHTML = `
+      <div class="info-box"><label>Client</label><div>${escapeHtml(d.client || '—')}</div></div>
+      <div class="info-box"><label>Service date</label><div>${escapeHtml(d.date || '—')}</div></div>
+      <div class="info-box"><label>Address</label><div>${escapeHtml(d.address || '—')}</div></div>
+      <div class="info-box"><label>Service level</label><div>${d.serviceLevel === 'deep' ? 'Deep Clean' : 'Standard Clean'}</div></div>
+    `;
+    body.appendChild(grid);
+
+    SCHEMA.forEach(sec=>{
+      if(sec.repeatable){
+        const instances = (d.sections && d.sections[sec.key]) || [];
+        instances.forEach(inst=>{
+          body.appendChild(renderSectionCard(sec, inst, `${sec.title} — ${inst.label || ''}`, d));
+        });
+      } else {
+        const state = (d.sections && d.sections[sec.key]) || {items:{}, photos:[]};
+        body.appendChild(renderSectionCard(sec, state, sec.title, d));
+      }
+    });
+
+    $('detailOverlay').classList.add('open');
+  }
+
+  function renderSectionCard(sec, state, titleText, job){
+    const c = sectionCounts(sec, state, job);
+    const card = document.createElement('div');
+    card.className = 'sec-card';
+    card.innerHTML = `<h3>${escapeHtml(titleText)}</h3><div class="sec-frac">${c.done} / ${c.total} tasks complete</div>`;
+
+    sec.items.forEach((text,i)=>{
+      const row = document.createElement('div');
+      const done = !!(state.items && state.items[i]);
+      row.className = 'item-row' + (done ? ' done' : '');
+      row.innerHTML = `<span class="tick">${done?'✓':'○'}</span><span>${escapeHtml(text)}</span>`;
+      card.appendChild(row);
+
+      const hasPhotoOpt = sec.itemPhotoIndices && sec.itemPhotoIndices.includes(i);
+      if(hasPhotoOpt){
+        const note = state.itemNotes && state.itemNotes[i];
+        if(note){
+          const noteEl = document.createElement('div');
+          noteEl.className = 'item-note';
+          noteEl.textContent = note;
+          card.appendChild(noteEl);
+        }
+        const photos = (state.itemPhotos && state.itemPhotos[i]) || [];
+        if(photos.length){
+          const pWrap = document.createElement('div');
+          pWrap.className = 'item-photos';
+          photos.forEach(src=>{
+            const img = document.createElement('img');
+            img.src = src; img.onclick = ()=>openLightbox(src);
+            pWrap.appendChild(img);
+          });
+          card.appendChild(pWrap);
+        }
+      }
+    });
+
+    if(job.serviceLevel === 'deep' && sec.deepItems){
+      sec.deepItems.forEach((text,i)=>{
+        const key = 'd'+i;
+        const row = document.createElement('div');
+        const done = !!(state.items && state.items[key]);
+        row.className = 'item-row' + (done ? ' done' : '');
+        row.innerHTML = `<span class="tick">${done?'✓':'○'}</span><span>${escapeHtml(text)} <span style="color:var(--gold); font-size:10px; font-weight:700;">DEEP</span></span>`;
+        card.appendChild(row);
+      });
+    }
+
+    const photos = state.photos || [];
+    if(photos.length){
+      const secPhotos = document.createElement('div');
+      secPhotos.className = 'sec-photos';
+      photos.forEach(src=>{
+        const img = document.createElement('img');
+        img.src = src; img.onclick = ()=>openLightbox(src);
+        secPhotos.appendChild(img);
+      });
+      card.appendChild(secPhotos);
+    }
+
+    return card;
+  }
+
+  function openLightbox(src){ $('lightboxImg').src = src; $('lightbox').classList.add('open'); }
+  $('lightboxClose').onclick = ()=> $('lightbox').classList.remove('open');
+  $('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') $('lightbox').classList.remove('open'); });
+
+  $('backBtn').onclick = ()=> $('detailOverlay').classList.remove('open');
+  $('searchInput').addEventListener('input', renderList);
+  $('statusFilter').addEventListener('change', renderList);
+
+  /* ---------------- Login flow ---------------- */
+  function showLoginError(msg){ const el=$('loginError'); el.textContent=msg; el.classList.add('show'); }
+
+  $('loginBtn').onclick = async ()=>{
+    const email = $('loginEmail').value.trim();
+    const password = $('loginPassword').value;
+    $('loginError').classList.remove('show');
+    $('notAdminMsg').style.display = 'none';
+    if(!email || !password){ showLoginError('Enter your email and password'); return; }
+    $('loginBtn').disabled = true; $('loginBtn').textContent = 'Signing in…';
+    try{
+      await signIn(email, password);
+      if(!isAdmin()){
+        $('notAdminMsg').style.display = 'block';
+        clearSession();
+        return;
+      }
+      $('loginGate').classList.add('hidden');
+      await loadAllJobs();
+      renderList();
+    }catch(e){
+      showLoginError(e.message || 'Could not sign in.');
+    }finally{
+      $('loginBtn').disabled = false; $('loginBtn').textContent = 'Log In';
+    }
+  };
+  $('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') $('loginBtn').click(); });
+
+  $('logoutBtn').onclick = ()=>{
+    if(!confirm('Log out?')) return;
+    clearSession();
+    location.reload();
+  };
+
+  (async function init(){
+    const s = await ensureSession();
+    if(s && isAdmin()){
+      session = s;
+      $('loginGate').classList.add('hidden');
+      await loadAllJobs();
+      renderList();
+    } else {
+      if(s && !isAdmin()){ $('notAdminMsg').style.display = 'block'; clearSession(); }
+      $('loginGate').classList.remove('hidden');
+    }
+  })();
+
+})();
+</script>
+</body>
+</html>
