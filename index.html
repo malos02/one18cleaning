@@ -1030,6 +1030,9 @@
   const root = $('sectionsRoot');
   let expandedKeys = new Set([SCHEMA[0].key]);
 
+  /* ---------------- Lock helper ---------------- */
+  function isLocked(){ return current && current.status === 'submitted'; }
+
   function render(){
     if(!current) return;
     $('jobNameInput').value = current.name || '';
@@ -1045,6 +1048,14 @@
 
     document.querySelectorAll('#serviceToggle button').forEach(b=>{
       b.classList.toggle('active', b.dataset.level === current.serviceLevel);
+      b.disabled = isLocked();
+      b.style.opacity = isLocked() ? '0.5' : '';
+    });
+
+    // Lock/unlock job detail fields
+    ['jobNameInput','clientInput','dateInput','addressInput'].forEach(id=>{
+      const el = $(id);
+      if(el) el.disabled = isLocked();
     });
 
     const overall = computeOverallPct();
@@ -1084,6 +1095,10 @@
       };
       banner.appendChild(reopenBtn);
       area.appendChild(banner);
+      const lockedNote = document.createElement('div');
+      lockedNote.style.cssText = 'text-align:center; font-size:11.5px; color:var(--slate); margin-top:6px;';
+      lockedNote.textContent = '🔒 This job is locked. Tap "Reopen to edit" above to make changes.';
+      area.appendChild(lockedNote);
     } else {
       const btn = document.createElement('button');
       btn.className = 'submit-job-btn';
@@ -1277,10 +1292,13 @@
     textarea.className = 'item-note-textarea';
     textarea.placeholder = 'e.g. Scuff on hallway baseboard, roughly 3 inches, appeared pre-existing...';
     textarea.value = state.itemNotes[itemIndex] || '';
-    textarea.addEventListener('input', (e)=>{
-      state.itemNotes[itemIndex] = e.target.value;
-      scheduleSave();
-    });
+    textarea.disabled = isLocked();
+    if(!isLocked()){
+      textarea.addEventListener('input', (e)=>{
+        state.itemNotes[itemIndex] = e.target.value;
+        scheduleSave();
+      });
+    }
     strip.appendChild(textarea);
 
     const photoLabel = document.createElement('div');
@@ -1304,28 +1322,30 @@
       grid.appendChild(thumb);
     });
 
-    const addTile = document.createElement('label');
-    addTile.className = 'add-photo add-photo-sm';
-    addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
-    input.multiple = true;
-    input.style.display = 'none';
-    input.addEventListener('change', async (e)=>{
-      const files = Array.from(e.target.files || []);
-      for(const f of files){
-        try{
-          const dataUrl = await compressImage(f);
-          state.itemPhotos[itemIndex] = state.itemPhotos[itemIndex] || [];
-          state.itemPhotos[itemIndex].push(dataUrl);
-        }catch(err){ console.error(err); toast('Could not add that photo'); }
-      }
-      scheduleSave(); render();
-    });
-    addTile.appendChild(input);
-    grid.appendChild(addTile);
+    if(!isLocked()){
+      const addTile = document.createElement('label');
+      addTile.className = 'add-photo add-photo-sm';
+      addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+      input.multiple = true;
+      input.style.display = 'none';
+      input.addEventListener('change', async (e)=>{
+        const files = Array.from(e.target.files || []);
+        for(const f of files){
+          try{
+            const dataUrl = await compressImage(f);
+            state.itemPhotos[itemIndex] = state.itemPhotos[itemIndex] || [];
+            state.itemPhotos[itemIndex].push(dataUrl);
+          }catch(err){ console.error(err); toast('Could not add that photo'); }
+        }
+        scheduleSave(); render();
+      });
+      addTile.appendChild(input);
+      grid.appendChild(addTile);
+    }
 
     strip.appendChild(grid);
     return strip;
@@ -1336,10 +1356,12 @@
     row.className = 'check-item' + (checked ? ' done' : '');
     const id = 'chk_' + uid();
     row.innerHTML = `
-      <input type="checkbox" id="${id}" ${checked?'checked':''}>
+      <input type="checkbox" id="${id}" ${checked?'checked':''} ${isLocked()?'disabled':''}>
       <label for="${id}">${escapeHtml(text)}${isDeep ? '<span class="deep-flag">DEEP</span>' : ''}</label>
     `;
-    row.querySelector('input').addEventListener('change', e => onChange(e.target.checked));
+    if(!isLocked()){
+      row.querySelector('input').addEventListener('change', e => onChange(e.target.checked));
+    }
     return row;
   }
 
@@ -1353,38 +1375,42 @@
     (state.photos||[]).forEach((src, idx)=>{
       const thumb = document.createElement('div');
       thumb.className = 'photo-thumb';
-      thumb.innerHTML = `<img src="${src}" alt="Job photo"><button class="rm">✕</button>`;
+      thumb.innerHTML = `<img src="${src}" alt="Job photo">${!isLocked() ? '<button class="rm">✕</button>' : ''}`;
       thumb.querySelector('img').onclick = ()=> openLightbox(src);
-      thumb.querySelector('.rm').onclick = (e)=>{
-        e.stopPropagation();
-        state.photos.splice(idx,1);
-        scheduleSave(); render();
-      };
+      if(!isLocked()){
+        thumb.querySelector('.rm').onclick = (e)=>{
+          e.stopPropagation();
+          state.photos.splice(idx,1);
+          scheduleSave(); render();
+        };
+      }
       grid.appendChild(thumb);
     });
 
-    const addTile = document.createElement('label');
-    addTile.className = 'add-photo';
-    addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
-    input.multiple = true;
-    input.style.display = 'none';
-    input.addEventListener('change', async (e)=>{
-      const files = Array.from(e.target.files || []);
-      for(const f of files){
-        try{
-          const dataUrl = await compressImage(f);
-          state.photos = state.photos || [];
-          state.photos.push(dataUrl);
-        }catch(err){ console.error(err); toast('Could not add that photo'); }
-      }
-      scheduleSave(); render();
-    });
-    addTile.appendChild(input);
-    grid.appendChild(addTile);
+    if(!isLocked()){
+      const addTile = document.createElement('label');
+      addTile.className = 'add-photo';
+      addTile.innerHTML = `<span class="plus">+</span><span>Photo</span>`;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+      input.multiple = true;
+      input.style.display = 'none';
+      input.addEventListener('change', async (e)=>{
+        const files = Array.from(e.target.files || []);
+        for(const f of files){
+          try{
+            const dataUrl = await compressImage(f);
+            state.photos = state.photos || [];
+            state.photos.push(dataUrl);
+          }catch(err){ console.error(err); toast('Could not add that photo'); }
+        }
+        scheduleSave(); render();
+      });
+      addTile.appendChild(input);
+      grid.appendChild(addTile);
+    }
 
     block.appendChild(grid);
     return block;
