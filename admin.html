@@ -104,7 +104,35 @@
   .item-row.done{color:var(--slate);}
   .item-row.done .tick{color:var(--green);}
   .item-row:not(.done) .tick{color:var(--line);}
+  .item-row.editable{cursor:pointer; user-select:none;}
+  .item-row.editable:hover{background:var(--cream);}
   .item-note{background:var(--red-bg); border-radius:8px; padding:8px 10px; font-size:12.5px; color:#7A392F; margin:6px 0 6px 24px;}
+  .item-note-edit{
+    width:calc(100% - 24px); margin:6px 0 6px 24px; min-height:50px; resize:vertical;
+    border:1.3px solid var(--line); border-radius:8px; padding:7px 9px; font-family:'Inter',sans-serif;
+    font-size:12.5px; color:var(--ink); background:#FCFAF4; outline:none;
+  }
+  .edit-field{
+    width:100%; border:1.3px solid var(--line); border-radius:8px; padding:7px 9px;
+    font-size:13.5px; font-weight:600; font-family:'Inter',sans-serif; color:var(--ink); background:#FCFAF4; outline:none;
+  }
+  .save-bar{
+    position:sticky; bottom:0; background:var(--paper); border-top:1px solid var(--line);
+    padding:12px 16px; display:flex; gap:10px; z-index:6;
+  }
+  .save-btn{flex:1; background:var(--green); color:#fff; border:none; border-radius:10px; padding:12px; font-size:14px; font-weight:700;}
+  .save-btn:disabled{opacity:0.6;}
+  .delete-btn{background:var(--red-bg); color:var(--red); border:1px solid var(--red); border-radius:10px; padding:12px 16px; font-size:13px; font-weight:700;}
+  .save-status{text-align:center; font-size:11.5px; color:var(--slate); padding:6px 0 0;}
+
+  .mode-tabs{display:flex; gap:8px; margin-top:12px;}
+  .mode-tab{
+    flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.75);
+    border-radius:9px; padding:9px; font-size:13px; font-weight:600;
+  }
+  .mode-tab.active{background:var(--gold); border-color:var(--gold); color:var(--navy);}
+  .view-text{font-size:13.5px; font-weight:600; padding:2px 0;}
+  .view-note{background:var(--red-bg); border-radius:8px; padding:8px 10px; font-size:12.5px; color:#7A392F; margin:6px 0 6px 24px;}
   .item-photos{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px 24px;}
   .item-photos img{width:56px; height:56px; border-radius:7px; object-fit:cover; cursor:pointer; border:1px solid var(--line);}
   .sec-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);}
@@ -151,7 +179,7 @@
   <div class="filter-row">
     <input type="text" id="searchInput" placeholder="Search by job name, client, or address...">
     <select id="statusFilter">
-      <option value="">All statuses</option>
+      <option value="" selected>All statuses</option>
       <option value="submitted">Submitted</option>
       <option value="in_progress">In progress</option>
     </select>
@@ -164,8 +192,17 @@
     <button class="back" id="backBtn">← All jobs</button>
     <h2 id="detailTitle">Job</h2>
     <div class="sub" id="detailSub"></div>
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="viewTabBtn">View</button>
+      <button class="mode-tab" id="editTabBtn">Edit</button>
+    </div>
   </div>
   <div class="detail-body" id="detailBody"></div>
+  <div class="save-bar" id="saveBar" style="display:none;">
+    <button class="delete-btn" id="deleteJobBtn">Delete job</button>
+    <button class="save-btn" id="saveJobBtn">Save changes</button>
+  </div>
+  <div class="save-status" id="saveStatus"></div>
 </div>
 
 <div class="lightbox" id="lightbox">
@@ -328,12 +365,34 @@
     });
   }
 
-  /* ---------------- Detail rendering ---------------- */
+  /* ---------------- Detail rendering (view / edit modes) ---------------- */
+  let currentDetailJob = null; // reference into allJobs currently open
+  let detailMode = 'view';
+
   function openDetail(j){
+    currentDetailJob = j;
+    detailMode = 'view';
+    updateModeTabs();
+    renderDetail();
+    $('detailOverlay').classList.add('open');
+  }
+
+  function updateModeTabs(){
+    $('viewTabBtn').classList.toggle('active', detailMode === 'view');
+    $('editTabBtn').classList.toggle('active', detailMode === 'edit');
+    $('saveBar').style.display = detailMode === 'edit' ? 'flex' : 'none';
+  }
+
+  $('viewTabBtn').onclick = ()=>{ detailMode = 'view'; updateModeTabs(); renderDetail(); };
+  $('editTabBtn').onclick = ()=>{ detailMode = 'edit'; updateModeTabs(); renderDetail(); };
+
+  function renderDetail(){
+    const j = currentDetailJob;
     const d = j.data || {};
     $('detailTitle').textContent = d.name || 'Untitled job';
     const dt = j.updated_at ? new Date(j.updated_at).toLocaleString() : '';
     $('detailSub').textContent = `${j.created_by ? j.created_by+' · ' : ''}${j.status === 'submitted' ? 'Submitted' : 'In progress'}${dt ? ' · Updated '+dt : ''}`;
+    $('saveStatus').textContent = '';
 
     const body = $('detailBody');
     body.innerHTML = '';
@@ -345,15 +404,11 @@
       body.appendChild(img);
     }
 
-    const grid = document.createElement('div');
-    grid.className = 'info-grid';
-    grid.innerHTML = `
-      <div class="info-box"><label>Client</label><div>${escapeHtml(d.client || '—')}</div></div>
-      <div class="info-box"><label>Service date</label><div>${escapeHtml(d.date || '—')}</div></div>
-      <div class="info-box"><label>Address</label><div>${escapeHtml(d.address || '—')}</div></div>
-      <div class="info-box"><label>Service level</label><div>${d.serviceLevel === 'deep' ? 'Deep Clean' : 'Standard Clean'}</div></div>
-    `;
-    body.appendChild(grid);
+    if(detailMode === 'edit'){
+      renderHeaderEdit(body, j, d);
+    } else {
+      renderHeaderView(body, j, d);
+    }
 
     SCHEMA.forEach(sec=>{
       if(sec.repeatable){
@@ -366,8 +421,54 @@
         body.appendChild(renderSectionCard(sec, state, sec.title, d));
       }
     });
+  }
 
-    $('detailOverlay').classList.add('open');
+  function renderHeaderView(body, j, d){
+    const grid = document.createElement('div');
+    grid.className = 'info-grid';
+    grid.innerHTML = `
+      <div class="info-box"><label>Client</label><div class="view-text">${escapeHtml(d.client || '—')}</div></div>
+      <div class="info-box"><label>Service date</label><div class="view-text">${escapeHtml(d.date || '—')}</div></div>
+      <div class="info-box"><label>Address</label><div class="view-text">${escapeHtml(d.address || '—')}</div></div>
+      <div class="info-box"><label>Service level</label><div class="view-text">${d.serviceLevel === 'deep' ? 'Deep Clean' : 'Standard Clean'}</div></div>
+    `;
+    body.appendChild(grid);
+  }
+
+  function renderHeaderEdit(body, j, d){
+    const grid = document.createElement('div');
+    grid.className = 'info-grid';
+    grid.innerHTML = `
+      <div class="info-box"><label>Job name</label><input class="edit-field" id="editName" value="${escapeHtml(d.name||'')}"></div>
+      <div class="info-box"><label>Client</label><input class="edit-field" id="editClient" value="${escapeHtml(d.client||'')}"></div>
+      <div class="info-box"><label>Service date</label><input class="edit-field" type="date" id="editDate" value="${escapeHtml(d.date||'')}"></div>
+      <div class="info-box"><label>Address</label><input class="edit-field" id="editAddress" value="${escapeHtml(d.address||'')}"></div>
+      <div class="info-box"><label>Service level</label>
+        <select class="edit-field" id="editServiceLevel">
+          <option value="standard" ${d.serviceLevel!=='deep'?'selected':''}>Standard Clean</option>
+          <option value="deep" ${d.serviceLevel==='deep'?'selected':''}>Deep Clean</option>
+        </select>
+      </div>
+      <div class="info-box"><label>Status</label>
+        <select class="edit-field" id="editStatus">
+          <option value="in_progress" ${j.status!=='submitted'?'selected':''}>In progress</option>
+          <option value="submitted" ${j.status==='submitted'?'selected':''}>Submitted</option>
+        </select>
+      </div>
+    `;
+    body.appendChild(grid);
+    ['editName','editClient','editDate','editAddress'].forEach(id=>{
+      $(id).addEventListener('input', ()=>{
+        const map = {editName:'name', editClient:'client', editDate:'date', editAddress:'address'};
+        d[map[id]] = $(id).value;
+      });
+    });
+    $('editServiceLevel').addEventListener('change', ()=>{ d.serviceLevel = $('editServiceLevel').value; renderDetail(); });
+    $('editStatus').addEventListener('change', ()=>{
+      j.status = $('editStatus').value;
+      d.status = j.status;
+      d.submittedAt = j.status === 'submitted' ? (d.submittedAt || Date.now()) : null;
+    });
   }
 
   function renderSectionCard(sec, state, titleText, job){
@@ -379,19 +480,35 @@
     sec.items.forEach((text,i)=>{
       const row = document.createElement('div');
       const done = !!(state.items && state.items[i]);
-      row.className = 'item-row' + (done ? ' done' : '');
+      const editable = detailMode === 'edit';
+      row.className = 'item-row' + (editable ? ' editable' : '') + (done ? ' done' : '');
       row.innerHTML = `<span class="tick">${done?'✓':'○'}</span><span>${escapeHtml(text)}</span>`;
+      if(editable){
+        row.onclick = ()=>{
+          state.items = state.items || {};
+          state.items[i] = !state.items[i];
+          renderDetail();
+        };
+      }
       card.appendChild(row);
 
       const hasPhotoOpt = sec.itemPhotoIndices && sec.itemPhotoIndices.includes(i);
       if(hasPhotoOpt){
-        const note = state.itemNotes && state.itemNotes[i];
-        if(note){
+        state.itemNotes = state.itemNotes || {};
+        if(editable){
+          const noteArea = document.createElement('textarea');
+          noteArea.className = 'item-note-edit';
+          noteArea.placeholder = 'No notes recorded';
+          noteArea.value = state.itemNotes[i] || '';
+          noteArea.addEventListener('input', ()=>{ state.itemNotes[i] = noteArea.value; });
+          card.appendChild(noteArea);
+        } else if(state.itemNotes[i]){
           const noteEl = document.createElement('div');
-          noteEl.className = 'item-note';
-          noteEl.textContent = note;
+          noteEl.className = 'view-note';
+          noteEl.textContent = state.itemNotes[i];
           card.appendChild(noteEl);
         }
+
         const photos = (state.itemPhotos && state.itemPhotos[i]) || [];
         if(photos.length){
           const pWrap = document.createElement('div');
@@ -411,8 +528,16 @@
         const key = 'd'+i;
         const row = document.createElement('div');
         const done = !!(state.items && state.items[key]);
-        row.className = 'item-row' + (done ? ' done' : '');
+        const editable = detailMode === 'edit';
+        row.className = 'item-row' + (editable ? ' editable' : '') + (done ? ' done' : '');
         row.innerHTML = `<span class="tick">${done?'✓':'○'}</span><span>${escapeHtml(text)} <span style="color:var(--gold); font-size:10px; font-weight:700;">DEEP</span></span>`;
+        if(editable){
+          row.onclick = ()=>{
+            state.items = state.items || {};
+            state.items[key] = !state.items[key];
+            renderDetail();
+          };
+        }
         card.appendChild(row);
       });
     }
@@ -436,7 +561,65 @@
   $('lightboxClose').onclick = ()=> $('lightbox').classList.remove('open');
   $('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') $('lightbox').classList.remove('open'); });
 
-  $('backBtn').onclick = ()=> $('detailOverlay').classList.remove('open');
+  $('backBtn').onclick = ()=>{
+    $('detailOverlay').classList.remove('open');
+    currentDetailJob = null;
+    renderList();
+  };
+
+  $('saveJobBtn').onclick = async ()=>{
+    if(!currentDetailJob) return;
+    const j = currentDetailJob;
+    const d = j.data;
+    d.updatedAt = Date.now();
+    $('saveJobBtn').disabled = true;
+    $('saveJobBtn').textContent = 'Saving…';
+    $('saveStatus').textContent = '';
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+        method:'PATCH',
+        headers: { ...authHeaders(), 'Prefer':'return=minimal' },
+        body: JSON.stringify({
+          data: d,
+          status: j.status,
+          submitted_at: d.submittedAt ? new Date(d.submittedAt).toISOString() : null,
+          updated_at: new Date(d.updatedAt).toISOString()
+        })
+      });
+      if(!res.ok) throw new Error('Save failed: '+res.status);
+      j.updated_at = new Date(d.updatedAt).toISOString();
+      $('saveStatus').textContent = 'Saved.';
+      detailMode = 'view';
+      updateModeTabs();
+      renderDetail();
+    }catch(e){
+      console.error(e);
+      $('saveStatus').textContent = 'Could not save — check your connection.';
+    }finally{
+      $('saveJobBtn').disabled = false;
+      $('saveJobBtn').textContent = 'Save changes';
+    }
+  };
+
+  $('deleteJobBtn').onclick = async ()=>{
+    if(!currentDetailJob) return;
+    const j = currentDetailJob;
+    const name = (j.data && j.data.name) || 'Untitled job';
+    if(!confirm(`Delete "${name}"? This can't be undone.`)) return;
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+        method:'DELETE', headers: authHeaders()
+      });
+      if(!res.ok) throw new Error('Delete failed: '+res.status);
+      allJobs = allJobs.filter(x=>x.id !== j.id);
+      currentDetailJob = null;
+      $('detailOverlay').classList.remove('open');
+      renderList();
+    }catch(e){
+      console.error(e);
+      alert('Could not delete — check your connection.');
+    }
+  };
   $('searchInput').addEventListener('input', renderList);
   $('statusFilter').addEventListener('change', renderList);
 
