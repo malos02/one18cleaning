@@ -1033,6 +1033,73 @@
   /* ---------------- Lock helper ---------------- */
   function isLocked(){ return current && current.status === 'submitted'; }
 
+  /* ---------------- Change ledger diff (runs on contractor side at submit) ---------------- */
+  function generateLedgerEntry(snapshot, job){
+    const changes = [];
+    const snap = snapshot.details || {};
+    const fieldLabels = { name:'Job name', client:'Client', date:'Service date', address:'Address', serviceLevel:'Service level' };
+    Object.keys(fieldLabels).forEach(f=>{
+      const before = snap[f] || '';
+      const after = job[f] || '';
+      if(before !== after){
+        const bVal = f==='serviceLevel'?(before==='deep'?'Deep Clean':'Standard Clean'):(before||'—');
+        const aVal = f==='serviceLevel'?(after==='deep'?'Deep Clean':'Standard Clean'):(after||'—');
+        changes.push(`${fieldLabels[f]}: "${bVal}" → "${aVal}"`);
+      }
+    });
+    const snapSecs = snapshot.sections || {};
+    SCHEMA.forEach(sec=>{
+      if(sec.repeatable){
+        const snapInsts = snapSecs[sec.key] || [];
+        const currInsts = (job.sections && job.sections[sec.key]) || [];
+        currInsts.forEach((inst,idx)=>{
+          const snapInst = snapInsts[idx] || {items:{},itemNotes:{}};
+          const lbl = inst.label || `${sec.instanceLabel} ${idx+1}`;
+          sec.items.forEach((text,i)=>{
+            const was = !!(snapInst.items && snapInst.items[i]);
+            const now = !!(inst.items && inst.items[i]);
+            if(was !== now) changes.push(`${sec.title} — ${lbl}: "${text}" ${now?'checked':'unchecked'}`);
+          });
+          if(sec.itemPhotoIndices){
+            sec.itemPhotoIndices.forEach(i=>{
+              const wasNote=(snapInst.itemNotes&&snapInst.itemNotes[i])||'';
+              const nowNote=(inst.itemNotes&&inst.itemNotes[i])||'';
+              if(wasNote!==nowNote) changes.push(`${sec.title} — ${lbl}: damage note updated`);
+              const wasP=((snapInst.itemPhotos&&snapInst.itemPhotos[i])||[]).length;
+              const nowP=((inst.itemPhotos&&inst.itemPhotos[i])||[]).length;
+              if(nowP>wasP) changes.push(`${sec.title} — ${lbl}: ${nowP-wasP} damage photo(s) added`);
+            });
+          }
+          const wasP=(snapInst.photos||[]).length;
+          const nowP=(inst.photos||[]).length;
+          if(nowP>wasP) changes.push(`${sec.title} — ${lbl}: ${nowP-wasP} section photo(s) added`);
+        });
+      } else {
+        const snapState=snapSecs[sec.key]||{items:{},itemNotes:{}};
+        const currState=(job.sections&&job.sections[sec.key])||{items:{}};
+        sec.items.forEach((text,i)=>{
+          const was=!!(snapState.items&&snapState.items[i]);
+          const now=!!(currState.items&&currState.items[i]);
+          if(was!==now) changes.push(`${sec.title}: "${text}" ${now?'checked':'unchecked'}`);
+        });
+        if(sec.itemPhotoIndices){
+          sec.itemPhotoIndices.forEach(i=>{
+            const wasNote=(snapState.itemNotes&&snapState.itemNotes[i])||'';
+            const nowNote=(currState.itemNotes&&currState.itemNotes[i])||'';
+            if(wasNote!==nowNote) changes.push(`${sec.title}: damage note updated`);
+            const wasP=((snapState.itemPhotos&&snapState.itemPhotos[i])||[]).length;
+            const nowP=((currState.itemPhotos&&currState.itemPhotos[i])||[]).length;
+            if(nowP>wasP) changes.push(`${sec.title}: ${nowP-wasP} damage photo(s) added`);
+          });
+        }
+        const wasP=(snapState.photos||[]).length;
+        const nowP=(currState.photos||[]).length;
+        if(nowP>wasP) changes.push(`${sec.title}: ${nowP-wasP} section photo(s) added`);
+      }
+    });
+    return changes;
+  }
+
   function render(){
     if(!current) return;
     $('jobNameInput').value = current.name || '';
@@ -1105,15 +1172,32 @@
       btn.textContent = 'Submit Completed Job';
       btn.onclick = ()=>{
         if(!confirm('Submit this job as complete? You can reopen it later if you need to make changes.')) return;
-        const wasModified = !!current.modifiedAfterSubmitAt;
         current.status = 'submitted';
         current.submittedAt = current.submittedAt || Date.now();
-        // Keep modifiedAfterSubmitAt so admin can see changes — only admin can clear it
-        // Take a new snapshot for future change detection
-        current.submittedSnapshot = {
-          details: { name: current.name, client: current.client, date: current.date, address: current.address, serviceLevel: current.serviceLevel },
-          sections: JSON.parse(JSON.stringify(current.sections))
-        };
+        if(!current.editLedger) current.editLedger = [];
+
+        if(current.submittedSnapshot && current.modifiedAfterSubmitAt){
+          // Compute what changed and add a ledger entry
+          const changes = generateLedgerEntry(current.submittedSnapshot, current);
+          current.editLedger.unshift({
+            timestamp: Date.now(),
+            email: session.email,
+            changes: changes.length ? changes : ['Job reopened and resubmitted — no specific checklist changes detected'],
+            reviewed: false
+          });
+          // Update snapshot so next edit cycle diffs from here
+          current.submittedSnapshot = {
+            details: { name: current.name, client: current.client, date: current.date, address: current.address, serviceLevel: current.serviceLevel },
+            sections: JSON.parse(JSON.stringify(current.sections))
+          };
+          // Keep modifiedAfterSubmitAt set — admin clears it by reviewing
+        } else if(!current.submittedSnapshot){
+          // First ever submission — just save the baseline snapshot
+          current.submittedSnapshot = {
+            details: { name: current.name, client: current.client, date: current.date, address: current.address, serviceLevel: current.serviceLevel },
+            sections: JSON.parse(JSON.stringify(current.sections))
+          };
+        }
         scheduleSave(); render();
         toast('Job submitted to the office');
       };
