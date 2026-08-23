@@ -1167,10 +1167,21 @@
       lockedNote.textContent = '🔒 This job is locked. Tap "Reopen to edit" above to make changes.';
       area.appendChild(lockedNote);
     } else {
+      const {done, total, pct} = computeOverallPct();
+      const ready = pct === 100;
       const btn = document.createElement('button');
       btn.className = 'submit-job-btn';
-      btn.textContent = 'Submit Completed Job';
+      btn.textContent = ready
+        ? 'Submit Completed Job'
+        : `Complete all tasks to submit — ${done} / ${total}`;
+      btn.style.opacity = ready ? '1' : '0.5';
+      btn.style.background = ready ? '' : 'var(--slate)';
       btn.onclick = ()=>{
+        const {done, total, pct} = computeOverallPct();
+        if(pct < 100){
+          toast(`Complete all tasks first — ${done} of ${total} done (${pct}%)`);
+          return;
+        }
         if(!confirm('Submit this job as complete? You can reopen it later if you need to make changes.')) return;
         current.status = 'submitted';
         current.submittedAt = current.submittedAt || Date.now();
