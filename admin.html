@@ -127,14 +127,45 @@
     font-size:10.5px; color:var(--red); font-weight:600; margin-top:3px;
     background:var(--red-bg); border-radius:6px; padding:2px 7px; display:inline-block;
   }
-  .modified-banner{
-    background:#FFF7E6; border:1.5px solid #E8A838; border-radius:10px;
-    padding:12px 14px; font-size:13px; color:#7A4F00; margin-bottom:14px; line-height:1.5;
+  .ledger-wrap{ margin-bottom:16px; }
+  .ledger-section-head{
+    font-size:13px; font-weight:700; padding:10px 14px;
+    border-radius:10px 10px 0 0; margin-bottom:0;
   }
-  .change-list{
-    margin:8px 0 0; padding-left:18px; font-size:12.5px; color:#7A4F00;
+  .ledger-section-head.unreviewed{
+    background:#FFF7E6; color:#7A4F00; border:1.5px solid #E8A838; border-bottom:none;
   }
-  .change-list li{ padding:2px 0; }
+  .ledger-entry{
+    border:1.5px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:8px;
+  }
+  .ledger-entry.unreviewed-entry{
+    border-color:#E8A838; background:#FFFCF4;
+    border-radius:0 0 10px 10px; margin-bottom:10px;
+  }
+  .ledger-entry.reviewed{
+    background:var(--cream); border-color:var(--line); opacity:0.85;
+  }
+  .ledger-entry-head{
+    display:flex; align-items:center; gap:8px; margin-bottom:6px;
+  }
+  .ledger-dot{
+    width:8px; height:8px; border-radius:50%; background:#E8A838; flex:none;
+  }
+  .ledger-entry.reviewed .ledger-dot{ background:var(--slate); }
+  .ledger-meta{ font-size:12.5px; color:var(--ink); flex:1; }
+  .ledger-reviewed-tag{
+    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--green); background:var(--green-bg); border:1px solid var(--green);
+    border-radius:20px; padding:2px 7px; flex:none;
+  }
+  .ledger-changes{
+    margin:4px 0 8px 16px; padding:0; font-size:12.5px; color:var(--ink); line-height:1.6;
+  }
+  .ledger-changes li{ padding:1px 0; }
+  .ledger-review-btn{
+    background:var(--navy); color:#fff; border:none; border-radius:8px;
+    padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; width:100%;
+  }
   .save-status{text-align:center; font-size:11.5px; color:var(--slate); padding:6px 0 0;}
 
   .mode-tabs{display:flex; gap:8px; margin-top:12px;}
@@ -360,8 +391,9 @@
       const thumbHtml = d.photo
         ? `<img class="job-thumb" src="${d.photo}" alt="">`
         : `<div class="job-thumb-placeholder">🏠</div>`;
-      const modifiedBadge = d.modifiedAfterSubmitAt
-        ? `<div class="modified-badge">Edited after submission · ${new Date(d.modifiedAfterSubmitAt).toLocaleDateString()}</div>`
+      const unreviewedCount = (d.editLedger||[]).filter(e=>!e.reviewed).length;
+      const modifiedBadge = unreviewedCount > 0
+        ? `<div class="modified-badge">⚠ ${unreviewedCount} unreviewed edit${unreviewedCount>1?'s':''}</div>`
         : '';
       card.innerHTML = `
         ${thumbHtml}
@@ -498,39 +530,58 @@
     const body = $('detailBody');
     body.innerHTML = '';
 
-    if(d.modifiedAfterSubmitAt){
-      const banner = document.createElement('div');
-      banner.className = 'modified-banner';
-      const changedOn = new Date(d.modifiedAfterSubmitAt).toLocaleString();
-      let summaryHtml = '';
-      if(d.submittedSnapshot){
-        const changes = generateChangeSummary(d.submittedSnapshot, d);
-        if(changes.length){
-          summaryHtml = `<ul class="change-list">${changes.map(c=>`<li>${escapeHtml(c)}</li>`).join('')}</ul>`;
-        } else {
-          summaryHtml = `<div style="margin-top:6px; font-size:12px; opacity:0.8">No checklist changes detected — may be a note or photo update.</div>`;
-        }
+    // Show edit ledger if there are any entries
+    const ledger = d.editLedger || [];
+    const unreviewed = ledger.filter(e=>!e.reviewed);
+
+    if(unreviewed.length > 0 || ledger.length > 0){
+      const ledgerWrap = document.createElement('div');
+      ledgerWrap.className = 'ledger-wrap';
+
+      if(unreviewed.length > 0){
+        const unreviewedHead = document.createElement('div');
+        unreviewedHead.className = 'ledger-section-head unreviewed';
+        unreviewedHead.innerHTML = `⚠ ${unreviewed.length} unreviewed edit${unreviewed.length>1?'s':''} after submission`;
+        ledgerWrap.appendChild(unreviewedHead);
       }
-      banner.innerHTML = `<strong>⚠ Edited after submission · ${changedOn}</strong>${summaryHtml}`;
-      const reviewBtn = document.createElement('button');
-      reviewBtn.style.cssText = 'margin-top:10px; background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer; width:100%;';
-      reviewBtn.textContent = '✓ Mark as reviewed — clear this notice';
-      reviewBtn.onclick = async ()=>{
-        d.modifiedAfterSubmitAt = null;
-        const j = currentDetailJob;
-        try{
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
-            method:'PATCH',
-            headers: { ...authHeaders(), 'Prefer':'return=minimal' },
-            body: JSON.stringify({ data: d, updated_at: new Date().toISOString() })
-          });
-          if(!res.ok) throw new Error('Could not clear flag');
-          renderDetail();
-          toast('Marked as reviewed');
-        }catch(e){ alert('Could not save — check your connection.'); }
-      };
-      banner.appendChild(reviewBtn);
-      body.appendChild(banner);
+
+      ledger.forEach((entry, idx)=>{
+        const entryEl = document.createElement('div');
+        entryEl.className = 'ledger-entry' + (entry.reviewed ? ' reviewed' : ' unreviewed-entry');
+        const dt = new Date(entry.timestamp).toLocaleString();
+        entryEl.innerHTML = `
+          <div class="ledger-entry-head">
+            <span class="ledger-dot"></span>
+            <span class="ledger-meta"><strong>${escapeHtml(entry.email||'Contractor')}</strong> · ${dt}</span>
+            ${entry.reviewed ? '<span class="ledger-reviewed-tag">Reviewed</span>' : ''}
+          </div>
+          <ul class="ledger-changes">${(entry.changes||[]).map(c=>`<li>${escapeHtml(c)}</li>`).join('')}</ul>
+        `;
+        if(!entry.reviewed){
+          const reviewBtn = document.createElement('button');
+          reviewBtn.className = 'ledger-review-btn';
+          reviewBtn.textContent = '✓ Mark this edit as reviewed';
+          reviewBtn.onclick = async ()=>{
+            entry.reviewed = true;
+            const allReviewed = (d.editLedger||[]).every(e=>e.reviewed);
+            if(allReviewed) d.modifiedAfterSubmitAt = null;
+            const j = currentDetailJob;
+            try{
+              await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+                method:'PATCH',
+                headers:{...authHeaders(),'Prefer':'return=minimal'},
+                body: JSON.stringify({data:d, updated_at: new Date().toISOString()})
+              });
+              renderDetail();
+              toast('Edit marked as reviewed');
+            }catch(e){ alert('Could not save — check your connection.'); }
+          };
+          entryEl.appendChild(reviewBtn);
+        }
+        ledgerWrap.appendChild(entryEl);
+      });
+
+      body.appendChild(ledgerWrap);
     }
 
     if(d.photo){
