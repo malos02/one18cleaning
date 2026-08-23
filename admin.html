@@ -123,6 +123,18 @@
   .save-btn{flex:1; background:var(--green); color:#fff; border:none; border-radius:10px; padding:12px; font-size:14px; font-weight:700;}
   .save-btn:disabled{opacity:0.6;}
   .delete-btn{background:var(--red-bg); color:var(--red); border:1px solid var(--red); border-radius:10px; padding:12px 16px; font-size:13px; font-weight:700;}
+  .modified-badge{
+    font-size:10.5px; color:var(--red); font-weight:600; margin-top:3px;
+    background:var(--red-bg); border-radius:6px; padding:2px 7px; display:inline-block;
+  }
+  .modified-banner{
+    background:#FFF7E6; border:1.5px solid #E8A838; border-radius:10px;
+    padding:12px 14px; font-size:13px; color:#7A4F00; margin-bottom:14px; line-height:1.5;
+  }
+  .change-list{
+    margin:8px 0 0; padding-left:18px; font-size:12.5px; color:#7A4F00;
+  }
+  .change-list li{ padding:2px 0; }
   .save-status{text-align:center; font-size:11.5px; color:var(--slate); padding:6px 0 0;}
 
   .mode-tabs{display:flex; gap:8px; margin-top:12px;}
@@ -348,12 +360,16 @@
       const thumbHtml = d.photo
         ? `<img class="job-thumb" src="${d.photo}" alt="">`
         : `<div class="job-thumb-placeholder">🏠</div>`;
+      const modifiedBadge = d.modifiedAfterSubmitAt
+        ? `<div class="modified-badge">Edited after submission · ${new Date(d.modifiedAfterSubmitAt).toLocaleDateString()}</div>`
+        : '';
       card.innerHTML = `
         ${thumbHtml}
         <div class="job-info">
           <div class="jn">${escapeHtml(d.name || 'Untitled job')}</div>
           <div class="jm">${escapeHtml(d.client || 'No client name')}${d.address ? ' · '+escapeHtml(d.address) : ''}</div>
           <div class="jm">${j.created_by ? 'By '+escapeHtml(j.created_by) : ''}</div>
+          ${modifiedBadge}
         </div>
         <div class="job-side">
           <div class="pct">${pct}%</div>
@@ -363,6 +379,91 @@
       card.onclick = ()=> openDetail(j);
       area.appendChild(card);
     });
+  }
+
+  /* ---------------- Change summary diff ---------------- */
+  function generateChangeSummary(snapshot, d){
+    const changes = [];
+    const snap = snapshot.details || {};
+    const fieldLabels = { name:'Job name', client:'Client', date:'Service date', address:'Address', serviceLevel:'Service level' };
+    Object.keys(fieldLabels).forEach(f=>{
+      const before = snap[f] || '';
+      const after = d[f] || '';
+      if(before !== after){
+        const label = fieldLabels[f];
+        const bVal = f==='serviceLevel' ? (before==='deep'?'Deep Clean':'Standard Clean') : (before||'—');
+        const aVal = f==='serviceLevel' ? (after==='deep'?'Deep Clean':'Standard Clean') : (after||'—');
+        changes.push(`${label} changed: "${bVal}" → "${aVal}"`);
+      }
+    });
+
+    const snapSecs = snapshot.sections || {};
+    SCHEMA.forEach(sec=>{
+      if(sec.repeatable){
+        const snapInsts = snapSecs[sec.key] || [];
+        const currInsts = (d.sections && d.sections[sec.key]) || [];
+        currInsts.forEach((inst, idx)=>{
+          const snapInst = snapInsts[idx] || { items:{}, itemNotes:{} };
+          const lbl = inst.label || `${sec.instanceLabel} ${idx+1}`;
+          sec.items.forEach((text,i)=>{
+            const was = !!(snapInst.items && snapInst.items[i]);
+            const now = !!(inst.items && inst.items[i]);
+            if(was !== now) changes.push(`${sec.title} — ${lbl}: "${text}" ${now?'checked':'unchecked'}`);
+          });
+          if(sec.deepItems){
+            sec.deepItems.forEach((text,i)=>{
+              const key='d'+i;
+              const was = !!(snapInst.items && snapInst.items[key]);
+              const now = !!(inst.items && inst.items[key]);
+              if(was !== now) changes.push(`${sec.title} — ${lbl} (deep): "${text}" ${now?'checked':'unchecked'}`);
+            });
+          }
+          if(sec.itemPhotoIndices){
+            sec.itemPhotoIndices.forEach(i=>{
+              const wasNote = (snapInst.itemNotes && snapInst.itemNotes[i]) || '';
+              const nowNote = (inst.itemNotes && inst.itemNotes[i]) || '';
+              if(wasNote !== nowNote) changes.push(`${sec.title} — ${lbl}: damage/condition note updated`);
+              const wasPhotos = ((snapInst.itemPhotos && snapInst.itemPhotos[i]) || []).length;
+              const nowPhotos = ((inst.itemPhotos && inst.itemPhotos[i]) || []).length;
+              if(nowPhotos > wasPhotos) changes.push(`${sec.title} — ${lbl}: ${nowPhotos - wasPhotos} damage photo(s) added`);
+            });
+          }
+          const wasPhotos = (snapInst.photos || []).length;
+          const nowPhotos = (inst.photos || []).length;
+          if(nowPhotos > wasPhotos) changes.push(`${sec.title} — ${lbl}: ${nowPhotos - wasPhotos} section photo(s) added`);
+        });
+      } else {
+        const snapState = snapSecs[sec.key] || { items:{}, itemNotes:{} };
+        const currState = (d.sections && d.sections[sec.key]) || { items:{} };
+        sec.items.forEach((text,i)=>{
+          const was = !!(snapState.items && snapState.items[i]);
+          const now = !!(currState.items && currState.items[i]);
+          if(was !== now) changes.push(`${sec.title}: "${text}" ${now?'checked':'unchecked'}`);
+        });
+        if(sec.deepItems){
+          sec.deepItems.forEach((text,i)=>{
+            const key='d'+i;
+            const was = !!(snapState.items && snapState.items[key]);
+            const now = !!(currState.items && currState.items[key]);
+            if(was !== now) changes.push(`${sec.title} (deep): "${text}" ${now?'checked':'unchecked'}`);
+          });
+        }
+        if(sec.itemPhotoIndices){
+          sec.itemPhotoIndices.forEach(i=>{
+            const wasNote = (snapState.itemNotes && snapState.itemNotes[i]) || '';
+            const nowNote = (currState.itemNotes && currState.itemNotes[i]) || '';
+            if(wasNote !== nowNote) changes.push(`${sec.title}: damage/condition note updated`);
+            const wasP = ((snapState.itemPhotos && snapState.itemPhotos[i]) || []).length;
+            const nowP = ((currState.itemPhotos && currState.itemPhotos[i]) || []).length;
+            if(nowP > wasP) changes.push(`${sec.title}: ${nowP - wasP} damage photo(s) added`);
+          });
+        }
+        const wasPhotos = (snapState.photos || []).length;
+        const nowPhotos = (currState.photos || []).length;
+        if(nowPhotos > wasPhotos) changes.push(`${sec.title}: ${nowPhotos - wasPhotos} section photo(s) added`);
+      }
+    });
+    return changes;
   }
 
   /* ---------------- Detail rendering (view / edit modes) ---------------- */
@@ -396,6 +497,23 @@
 
     const body = $('detailBody');
     body.innerHTML = '';
+
+    if(d.modifiedAfterSubmitAt){
+      const banner = document.createElement('div');
+      banner.className = 'modified-banner';
+      const changedOn = new Date(d.modifiedAfterSubmitAt).toLocaleString();
+      let summaryHtml = '';
+      if(d.submittedSnapshot){
+        const changes = generateChangeSummary(d.submittedSnapshot, d);
+        if(changes.length){
+          summaryHtml = `<ul class="change-list">${changes.map(c=>`<li>${escapeHtml(c)}</li>`).join('')}</ul>`;
+        } else {
+          summaryHtml = `<div style="margin-top:6px; font-size:12px; opacity:0.8">No checklist changes detected — may be a note or photo update.</div>`;
+        }
+      }
+      banner.innerHTML = `<strong>⚠ Edited after submission · ${changedOn}</strong>${summaryHtml}`;
+      body.appendChild(banner);
+    }
 
     if(d.photo){
       const img = document.createElement('img');
