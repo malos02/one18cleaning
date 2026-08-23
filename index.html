@@ -920,6 +920,10 @@
     if(!current) return;
     current.updatedAt = Date.now();
     if(!current.createdBy && session) current.createdBy = session.email;
+    // Track if a previously-submitted job was edited after submission
+    if(current.submittedAt && current.status === 'in_progress'){
+      current.modifiedAfterSubmitAt = Date.now();
+    }
     try{
       const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
         method: 'POST',
@@ -1075,7 +1079,7 @@
       reopenBtn.textContent = 'Reopen to edit';
       reopenBtn.onclick = ()=>{
         current.status = 'in_progress';
-        current.submittedAt = null;
+        current.modifiedAfterSubmitAt = Date.now();
         scheduleSave(); render();
       };
       banner.appendChild(reopenBtn);
@@ -1087,7 +1091,13 @@
       btn.onclick = ()=>{
         if(!confirm('Submit this job as complete? You can reopen it later if you need to make changes.')) return;
         current.status = 'submitted';
-        current.submittedAt = Date.now();
+        current.submittedAt = current.submittedAt || Date.now();
+        current.modifiedAfterSubmitAt = null;
+        // Save a snapshot of the job at submission time for change tracking
+        current.submittedSnapshot = {
+          details: { name: current.name, client: current.client, date: current.date, address: current.address, serviceLevel: current.serviceLevel },
+          sections: JSON.parse(JSON.stringify(current.sections))
+        };
         scheduleSave(); render();
         toast('Job submitted to the office');
       };
