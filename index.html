@@ -893,8 +893,9 @@
   /* ---------------- Storage helpers (Supabase) ---------------- */
   async function loadJobsIndex(){
     try{
+      const email = encodeURIComponent(session.email);
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at&order=updated_at.desc`,
+        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at&created_by=eq.${email}&order=updated_at.desc`,
         { headers: authHeaders() }
       );
       if(!res.ok) throw new Error(`List failed: ${res.status}`);
@@ -909,8 +910,9 @@
   }
   async function loadJob(id){
     try{
+      const email = encodeURIComponent(session.email);
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=data`,
+        `${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&created_by=eq.${email}&select=data`,
         { headers: authHeaders() }
       );
       if(!res.ok) throw new Error(`Load failed: ${res.status}`);
