@@ -1105,10 +1105,11 @@
       btn.textContent = 'Submit Completed Job';
       btn.onclick = ()=>{
         if(!confirm('Submit this job as complete? You can reopen it later if you need to make changes.')) return;
+        const wasModified = !!current.modifiedAfterSubmitAt;
         current.status = 'submitted';
         current.submittedAt = current.submittedAt || Date.now();
-        current.modifiedAfterSubmitAt = null;
-        // Save a snapshot of the job at submission time for change tracking
+        // Keep modifiedAfterSubmitAt so admin can see changes — only admin can clear it
+        // Take a new snapshot for future change detection
         current.submittedSnapshot = {
           details: { name: current.name, client: current.client, date: current.date, address: current.address, serviceLevel: current.serviceLevel },
           sections: JSON.parse(JSON.stringify(current.sections))
