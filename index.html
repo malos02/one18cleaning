@@ -539,7 +539,7 @@
       <div class="tag">Cleaning With Purpose</div>
     </div>
     <button class="icon-btn" id="logoutBtn" style="margin-right:6px;">Log out</button>
-    <button class="icon-btn" id="switchJobsBtn">Jobs</button>
+    <button class="icon-btn" id="newJobTopBtn">+ New Job</button>
   </div>
 
   <div class="job-line">
@@ -696,15 +696,6 @@
       <button class="safety-ack-btn" id="safetyAckBtn">I have read and understood this list</button>
       <p class="safety-ack-hint">Required once per job before the checklist unlocks</p>
     </div>
-  </div>
-</div>
-
-<div class="switcher" id="switcherOverlay">
-  <div class="switcher-sheet">
-    <h3>Your jobs</h3>
-    <div id="jobList"></div>
-    <button class="new-job-btn" id="newJobBtn">+ Start a new job</button>
-    <button class="close-sheet" id="closeSwitcherBtn">Close</button>
   </div>
 </div>
 
@@ -1496,52 +1487,10 @@
     btn.onclick = ()=>{ current.serviceLevel = btn.dataset.level; scheduleSave(); render(); };
   });
 
-  /* ---------------- Job switcher ---------------- */
-  $('switchJobsBtn').onclick = openSwitcher;
-  $('closeSwitcherBtn').onclick = ()=> $('switcherOverlay').classList.remove('open');
-  $('switcherOverlay').addEventListener('click', e=>{ if(e.target.id==='switcherOverlay') $('switcherOverlay').classList.remove('open'); });
-
-  function openSwitcher(){
-    const list = $('jobList');
-    list.innerHTML = '';
-    if(jobsIndex.length === 0){
-      list.innerHTML = '<p style="color:var(--slate); font-size:13px;">No saved jobs yet.</p>';
-    }
-    jobsIndex.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(j=>{
-      const row = document.createElement('div');
-      row.className = 'job-item';
-      const dt = new Date(j.updatedAt);
-      row.innerHTML = `
-        <div class="info">
-          <div class="jname">${escapeHtml(j.name || 'Untitled job')}</div>
-          <div class="jmeta">Updated ${dt.toLocaleDateString()} · <button class="del-job">Delete</button></div>
-        </div>
-        <div class="pct">${j.pct||0}%</div>
-      `;
-      row.querySelector('.info').addEventListener('click', async (e)=>{
-        if(e.target.classList.contains('del-job')) return;
-        await switchToJob(j.id);
-        $('switcherOverlay').classList.remove('open');
-      });
-      row.querySelector('.del-job').addEventListener('click', async (e)=>{
-        e.stopPropagation();
-        if(!confirm(`Delete "${j.name || 'Untitled job'}"? This can't be undone.`)) return;
-        await deleteJobRemote(j.id);
-        jobsIndex = jobsIndex.filter(x=>x.id!==j.id);
-        if(current && current.id===j.id){
-          if(jobsIndex.length){ await switchToJob(jobsIndex[0].id); }
-          else { await startNewJob(); }
-        }
-        openSwitcher();
-      });
-      list.appendChild(row);
-    });
-    $('switcherOverlay').classList.add('open');
-  }
-
-  $('newJobBtn').onclick = async ()=>{
+  /* ---------------- New Job button ---------------- */
+  $('newJobTopBtn').onclick = async ()=>{
+    if(!confirm('Start a new job? Your current job is already saved.')) return;
     await startNewJob();
-    $('switcherOverlay').classList.remove('open');
   };
 
   async function switchToJob(id){
