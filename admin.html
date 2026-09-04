@@ -276,7 +276,6 @@
     <button class="icon-btn" id="tabJobs" style="flex:2;">📋 Jobs</button>
     <button class="icon-btn" id="tabContractors" style="flex:2;">👤 Team</button>
     <button class="icon-btn" id="exportBtn">⬇ Export</button>
-    <button class="icon-btn" id="createJobBtn">+ Job</button>
   </div>
 </div>
 
@@ -332,6 +331,7 @@
         <option value="archived">Archived</option>
       </select>
     </div>
+    <button id="createJobBtn" style="width:100%; background:var(--paper); border:1.5px dashed var(--line); border-radius:12px; padding:11px; font-size:13.5px; font-weight:600; color:var(--slate); cursor:pointer; margin-bottom:10px;">+ Create job manually (phone / walk-in booking)</button>
     <div id="jobListArea"></div>
   </div>
 
@@ -585,7 +585,8 @@
           </div>
         </div>
         <div class="card-actions">
-          <button class="card-btn assign">Assign</button>
+          ${j.status === 'in_progress' ? '<button class="card-btn assign">Assign</button>' : ''}
+          ${j.status === 'submitted' ? '<button class="card-btn review-btn" style="flex:2; background:#EEF2F9; color:var(--navy); border-color:var(--navy); font-weight:700;">👁 Review</button>' : ''}
           <button class="card-btn ${isArchived?'unarchive':'archive'}">${isArchived?'Unarchive':'Archive'}</button>
           <button class="card-btn delete">Delete</button>
         </div>
@@ -596,14 +597,32 @@
         openDetail(j);
       });
 
-      card.querySelector('.card-btn.assign').onclick = e=>{
+      const assignBtn = card.querySelector('.card-btn.assign');
+      if(assignBtn) assignBtn.onclick = e=>{
         e.stopPropagation();
         openAssignModal(j);
+      };
+
+      const reviewBtn = card.querySelector('.card-btn.review-btn');
+      if(reviewBtn) reviewBtn.onclick = e=>{
+        e.stopPropagation();
+        openDetail(j);
+        // Switch to edit mode so Approve button is visible
+        detailMode = 'edit';
+        updateModeTabs();
+        renderDetail();
       };
 
       card.querySelector(`.card-btn.${isArchived?'unarchive':'archive'}`).onclick = async e=>{
         e.stopPropagation();
         const newStatus = isArchived ? (d.submittedAt ? 'submitted' : 'in_progress') : 'archived';
+        // Warn if archiving an unreviewed submitted job
+        if(!isArchived && j.status === 'submitted'){
+          const proceed = confirm(`⚠ This job has not been reviewed or approved yet.\n\nArchiving it will move it out of your queue without the contractor being paid.\n\nAre you sure you want to archive without reviewing?`);
+          if(!proceed) return;
+        } else if(!isArchived) {
+          if(!confirm('Archive this job?')) return;
+        }
         try{
           await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
             method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
@@ -619,10 +638,17 @@
         e.stopPropagation();
         const name = d.name || d.client || 'this job';
         const isAssigned = !!(j.assigned_to || d.assignedTo);
-        const confirmMsg = isAssigned
-          ? `"${escapeHtml(name)}" is assigned to a contractor. It will be archived and they'll see a removal notice. Continue?`
-          : `Permanently delete "${escapeHtml(name)}"? This cannot be undone.`;
-        if(!confirm(confirmMsg)) return;
+
+        // Warn if deleting an unreviewed submitted job
+        if(j.status === 'submitted'){
+          const proceed = confirm(`⚠ This job has not been reviewed or approved yet.\n\nDeleting it means the contractor will not be paid for this work.\n\nAre you sure you want to delete without reviewing?`);
+          if(!proceed) return;
+        } else {
+          const confirmMsg = isAssigned
+            ? `"${escapeHtml(name)}" is assigned to a contractor. It will be archived and they'll see a removal notice. Continue?`
+            : `Permanently delete "${escapeHtml(name)}"? This cannot be undone.`;
+          if(!confirm(confirmMsg)) return;
+        }
         try{
           if(isAssigned){
             // Archive with removal flag so contractor sees notice
@@ -1296,10 +1322,29 @@
 
   $('cjSaveBtn').onclick = async ()=>{
     const contractor = $('cjContractor').value.trim();
+    const client = $('cjClient').value.trim();
+    const address = $('cjAddress').value.trim();
+    const date = $('cjDate').value;
     const err = $('cjError');
     err.classList.remove('show');
     if(!contractor){ err.textContent='Enter the contractor\'s email'; err.classList.add('show'); return; }
     if(!contractor.includes('@')){ err.textContent='Enter a valid email address'; err.classList.add('show'); return; }
+
+    // Duplicate detection — check existing jobs for same client+address or same address+date
+    const duplicates = allJobs.filter(j=>{
+      const d = j.data || {};
+      if(j.status === 'archived') return false;
+      const sameClient = client && d.client && d.client.toLowerCase() === client.toLowerCase();
+      const sameAddress = address && d.address && d.address.toLowerCase().includes(address.toLowerCase());
+      const sameDate = date && d.date === date;
+      return (sameClient && sameAddress) || (sameAddress && sameDate);
+    });
+
+    if(duplicates.length){
+      const dupNames = duplicates.map(j=>`"${j.data.client || j.data.name || 'Untitled'}" (${j.status})`).join(', ');
+      const proceed = confirm(`⚠ Possible duplicate detected!\n\nA job already exists with a similar client or address:\n${dupNames}\n\nCreate this job anyway?`);
+      if(!proceed) return;
+    }
 
     $('cjSaveBtn').disabled=true; $('cjSaveBtn').textContent='Creating…';
 
@@ -1320,9 +1365,9 @@
     const jobData = {
       id: jobId,
       name: $('cjName').value.trim() || '',
-      client: $('cjClient').value.trim(),
-      date: $('cjDate').value,
-      address: $('cjAddress').value.trim(),
+      client: client,
+      date: date,
+      address: address,
       photo: null,
       serviceLevel: $('cjServiceLevel').value,
       safetyAcknowledged: false,
@@ -1424,6 +1469,11 @@
     const j = currentDetailJob;
     const isArchived = j.status === 'archived';
     const newStatus = isArchived ? (j.data && j.data.submittedAt ? 'submitted' : 'in_progress') : 'archived';
+
+    if(!isArchived && j.status === 'submitted'){
+      const proceed = confirm(`⚠ This job has not been reviewed or approved yet.\n\nArchiving without approving means the contractor will not be paid.\n\nArchive anyway?`);
+      if(!proceed) return;
+    }
     try{
       await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
         method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
@@ -1478,10 +1528,16 @@
     const d = j.data || {};
     const name = d.name || d.client || 'Untitled job';
     const isAssigned = !!(j.assigned_to || d.assignedTo);
-    const confirmMsg = isAssigned
-      ? `"${name}" is assigned to a contractor. It will be archived and they'll see a removal notice. Continue?`
-      : `Permanently delete "${name}"? This can't be undone.`;
-    if(!confirm(confirmMsg)) return;
+
+    if(j.status === 'submitted'){
+      const proceed = confirm(`⚠ This job has not been reviewed or approved yet.\n\nDeleting without approving means the contractor will not be paid for this work.\n\nDelete anyway?`);
+      if(!proceed) return;
+    } else {
+      const confirmMsg = isAssigned
+        ? `"${name}" is assigned to a contractor. It will be archived and they'll see a removal notice. Continue?`
+        : `Permanently delete "${name}"? This can't be undone.`;
+      if(!confirm(confirmMsg)) return;
+    }
     try{
       if(isAssigned){
         d.removedByAdmin = true;
