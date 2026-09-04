@@ -316,6 +316,10 @@
   <img id="lightboxImg" src="" alt="Job photo">
 </div>
 
+<div style="position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:80; pointer-events:none;">
+  <div id="adminToast" style="background:var(--navy); color:#fff; padding:9px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .25s ease;"></div>
+</div>
+
 <script>
 (function(){
 
@@ -328,6 +332,14 @@
   let allJobs = []; // [{id, data, status, submitted_at, created_by, updated_at}]
 
   const $ = id => document.getElementById(id);
+
+  function toast(msg){
+    const el = $('adminToast');
+    el.textContent = msg;
+    el.style.opacity = '1';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>{ el.style.opacity = '0'; }, 1800);
+  }
 
   /* ---------------- Section schema (must mirror the contractor app) ---------------- */
   const SCHEMA = [
