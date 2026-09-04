@@ -253,7 +253,14 @@
   .check-item label{
     font-size:14px; line-height:1.4; cursor:pointer;
   }
-  .check-item.done label{color:var(--slate); text-decoration:line-through;}
+  .check-item.na label{ color:#A0AEC0; text-decoration:line-through; }
+  .check-item.na input[type=checkbox]{ opacity:0.4; }
+  .na-btn{
+    margin-left:auto; flex:none; background:none; border:1px solid #CBD5E0;
+    border-radius:5px; padding:2px 6px; font-size:10px; font-weight:700;
+    color:#A0AEC0; cursor:pointer; line-height:1.4;
+  }
+  .na-btn.active{ background:#EDF2F7; border-color:#A0AEC0; color:#718096; }
 
   .deep-flag{
     display:inline-block; font-size:9px; font-weight:700; color:var(--gold);
@@ -1168,18 +1175,33 @@
   /* ---------------- Progress math ---------------- */
   function sectionCounts(sec, state, job){
     if(sec.isAddons){
-      // Count only add-ons that are NOT already included in the service level
       const relevant = sec.addonItems.filter(a=>!a.includedIn.includes(job.serviceLevel));
-      const done = relevant.filter(a=>!!(state.items && state.items[a.key])).length;
-      return {done, total: relevant.length};
+      const applicable = relevant.filter(a=> state.items && state.items[a.key] !== 'na');
+      const done = applicable.filter(a=>state.items && state.items[a.key] === true).length;
+      return {done, total: applicable.length};
     }
     const deepOn = (job.serviceLevel === 'deep' || job.serviceLevel === 'move') && sec.deepItems;
     const moveOn = job.serviceLevel === 'move' && sec.moveItems;
-    const total = sec.items.length + (deepOn ? sec.deepItems.length : 0) + (moveOn ? sec.moveItems.length : 0);
-    let done = 0;
-    sec.items.forEach((_,i)=>{ if(state.items && state.items[i]) done++; });
-    if(deepOn) sec.deepItems.forEach((_,i)=>{ if(state.items && state.items['d'+i]) done++; });
-    if(moveOn) sec.moveItems.forEach((_,i)=>{ if(state.items && state.items['m'+i]) done++; });
+
+    let total = 0, done = 0;
+    sec.items.forEach((_,i)=>{
+      const v = state.items && state.items[i];
+      if(v === 'na') return; // skip N/A items
+      total++;
+      if(v === true) done++;
+    });
+    if(deepOn) sec.deepItems.forEach((_,i)=>{
+      const v = state.items && state.items['d'+i];
+      if(v === 'na') return;
+      total++;
+      if(v === true) done++;
+    });
+    if(moveOn) sec.moveItems.forEach((_,i)=>{
+      const v = state.items && state.items['m'+i];
+      if(v === 'na') return;
+      total++;
+      if(v === true) done++;
+    });
     return {done, total};
   }
   function computePctForJob(job){
@@ -1618,27 +1640,28 @@
     const wrap = document.createElement('div');
     sec.items.forEach((text, i)=>{
       const hasPhotoOption = sec.itemPhotoIndices && sec.itemPhotoIndices.includes(i);
-      wrap.appendChild(checkRow(text, !!state.items[i], (checked)=>{
-        state.items[i] = checked; scheduleSave(); render();
+      const val = state.items ? state.items[i] : false;
+      wrap.appendChild(checkRow(text, val, (newVal)=>{
+        state.items[i] = newVal; scheduleSave(); render();
       }));
-      if(hasPhotoOption){
-        wrap.appendChild(renderItemPhotoStrip(state, i));
-      }
+      if(hasPhotoOption) wrap.appendChild(renderItemPhotoStrip(state, i));
     });
     const deepOn = (current.serviceLevel === 'deep' || current.serviceLevel === 'move') && sec.deepItems;
     if(deepOn){
       sec.deepItems.forEach((text, i)=>{
         const key = 'd'+i;
-        wrap.appendChild(checkRow(text, !!state.items[key], (checked)=>{
-          state.items[key] = checked; scheduleSave(); render();
+        const val = state.items ? state.items[key] : false;
+        wrap.appendChild(checkRow(text, val, (newVal)=>{
+          state.items[key] = newVal; scheduleSave(); render();
         }, true));
       });
     }
     if(current.serviceLevel === 'move' && sec.moveItems){
       sec.moveItems.forEach((text, i)=>{
         const key = 'm'+i;
-        wrap.appendChild(checkRow(text, !!state.items[key], (checked)=>{
-          state.items[key] = checked; scheduleSave(); render();
+        const val = state.items ? state.items[key] : false;
+        wrap.appendChild(checkRow(text, val, (newVal)=>{
+          state.items[key] = newVal; scheduleSave(); render();
         }, 'move'));
       });
     }
@@ -1720,19 +1743,26 @@
     return strip;
   }
 
-  function checkRow(text, checked, onChange, flag){
+  function checkRow(text, val, onChange, flag){
+    const isNA = val === 'na';
+    const isChecked = val === true;
     const row = document.createElement('div');
-    row.className = 'check-item' + (checked ? ' done' : '');
+    row.className = 'check-item' + (isChecked ? ' done' : '') + (isNA ? ' na' : '');
     const id = 'chk_' + uid();
     const badge = flag === true ? '<span class="deep-flag">DEEP</span>'
                 : flag === 'move' ? '<span class="deep-flag" style="color:var(--green);border-color:var(--green)">MOVE</span>'
                 : '';
     row.innerHTML = `
-      <input type="checkbox" id="${id}" ${checked?'checked':''} ${isLocked()?'disabled':''}>
+      <input type="checkbox" id="${id}" ${isChecked?'checked':''} ${(isLocked()||isNA)?'disabled':''}>
       <label for="${id}">${escapeHtml(text)}${badge}</label>
+      <button class="na-btn${isNA?' active':''}" title="Mark as Not Applicable">${isNA?'N/A ✕':'N/A'}</button>
     `;
     if(!isLocked()){
-      row.querySelector('input').addEventListener('change', e => onChange(e.target.checked));
+      row.querySelector('input').addEventListener('change', e => onChange(e.target.checked ? true : false));
+      row.querySelector('.na-btn').addEventListener('click', e=>{
+        e.preventDefault();
+        onChange(isNA ? false : 'na');
+      });
     }
     return row;
   }
