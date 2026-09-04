@@ -77,6 +77,17 @@
   }
   .status-pill.submitted{background:var(--green-bg); color:var(--green); border:1px solid var(--green);}
   .status-pill.in_progress{background:var(--cream); color:var(--slate); border:1px solid var(--line);}
+  .status-pill.archived{background:#F0F0F0; color:#888; border:1px solid #CCC;}
+  .card-actions{display:flex; gap:6px; margin-top:6px; justify-content:flex-end;}
+  .card-btn{background:none; border:1px solid var(--line); border-radius:7px; padding:4px 9px; font-size:11px; cursor:pointer; font-weight:600;}
+  .card-btn.archive{color:var(--slate);}
+  .card-btn.archive:hover{border-color:var(--slate); background:var(--cream);}
+  .card-btn.unarchive{color:var(--green); border-color:var(--green);}
+  .card-btn.delete{color:var(--red); border-color:var(--red-bg);}
+  .card-btn.delete:hover{background:var(--red-bg);}
+  .search-wrap{display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;}
+  .search-wrap input{flex:1; min-width:180px; border:1.3px solid var(--line); border-radius:9px; padding:9px 11px; font-size:13.5px; background:var(--paper); outline:none;}
+  .search-wrap select{border:1.3px solid var(--line); border-radius:9px; padding:9px 11px; font-size:13.5px; background:var(--paper); outline:none;}
 
   .empty-msg{text-align:center; color:var(--slate); padding:40px 20px; font-size:13.5px;}
 
@@ -225,29 +236,10 @@
     <div class="name">One:18 Cleaning</div>
     <div class="tag">Admin Dashboard</div>
   </div>
-  <button class="icon-btn" id="gmailImportBtn" style="margin-right:6px;">📧 Quotes</button>
   <button class="icon-btn" id="createJobBtn" style="margin-right:6px;">+ Job</button>
   <button class="icon-btn" id="logoutBtn">Log out</button>
 </div>
 
-<!-- Gmail Import Modal -->
-<div class="login-gate" id="gmailModal" style="display:none; background:rgba(20,30,45,0.7); align-items:flex-end;">
-  <div style="background:var(--paper); width:100%; max-width:640px; border-radius:18px 18px 0 0; padding:20px 18px 28px; max-height:90vh; overflow-y:auto;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <div>
-        <h3 style="margin:0; font-size:18px;">📧 Import from Gmail</h3>
-        <div style="font-size:12px; color:var(--slate); margin-top:2px;">Recent quote request emails</div>
-      </div>
-      <button id="gmailCloseBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--slate);">✕</button>
-    </div>
-    <div id="gmailLoading" style="text-align:center; padding:30px; color:var(--slate); display:none;">
-      <div style="font-size:24px; margin-bottom:8px;">⏳</div>
-      Reading quote emails…
-    </div>
-    <div id="gmailQuotesList"></div>
-    <button id="gmailFetchBtn" class="login-btn" style="margin-top:8px;">Check Gmail for new quotes</button>
-  </div>
-</div>
 <div class="login-gate" id="createJobModal" style="display:none; background:rgba(20,30,45,0.7); align-items:flex-end;">
   <div style="background:var(--paper); width:100%; max-width:640px; border-radius:18px 18px 0 0; padding:20px 18px 28px; max-height:90vh; overflow-y:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -288,12 +280,13 @@
 </div>
 
 <main>
-  <div class="filter-row">
-    <input type="text" id="searchInput" placeholder="Search by job name, client, or address...">
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Search by name, client, address, contractor...">
     <select id="statusFilter">
-      <option value="" selected>All statuses</option>
+      <option value="active" selected>All active jobs</option>
       <option value="submitted">Submitted</option>
       <option value="in_progress">In progress</option>
+      <option value="archived">Archived</option>
     </select>
   </div>
   <div id="jobListArea"></div>
@@ -311,7 +304,8 @@
   </div>
   <div class="detail-body" id="detailBody"></div>
   <div class="save-bar" id="saveBar" style="display:none;">
-    <button class="delete-btn" id="deleteJobBtn">Delete job</button>
+    <button class="delete-btn" id="deleteJobBtn">Delete</button>
+    <button class="delete-btn" id="archiveJobBtn" style="background:var(--cream); color:var(--slate); border-color:var(--slate);">Archive</button>
     <button class="save-btn" id="saveJobBtn">Save changes</button>
   </div>
   <div class="save-status" id="saveStatus"></div>
@@ -439,24 +433,33 @@
 
     let filtered = allJobs.filter(j=>{
       const d = j.data || {};
-      if(statusF && j.status !== statusF) return false;
+      const isArchived = j.status === 'archived';
+      if(statusF === 'active' && isArchived) return false;
+      if(statusF === 'archived' && !isArchived) return false;
+      if(statusF === 'submitted' && j.status !== 'submitted') return false;
+      if(statusF === 'in_progress' && j.status !== 'in_progress') return false;
       if(q){
-        const hay = `${d.name||''} ${d.client||''} ${d.address||''}`.toLowerCase();
+        const hay = [d.name, d.client, d.address, d.clientEmail, d.clientPhone,
+          d.notes, j.created_by, j.assigned_to, d.assignedTo, d.date
+        ].filter(Boolean).join(' ').toLowerCase();
         if(!hay.includes(q)) return false;
       }
       return true;
     });
 
     if(filtered.length === 0){
-      area.innerHTML = '<div class="empty-msg">No jobs match.</div>';
+      area.innerHTML = `<div class="empty-msg">${q?'No jobs match "'+escapeHtml(q)+'"':'No jobs here yet.'}</div>`;
       return;
     }
 
     filtered.forEach(j=>{
       const d = j.data || {};
       const pct = computePctForJob(d);
+      const isArchived = j.status === 'archived';
       const card = document.createElement('div');
       card.className = 'job-card';
+      card.style.opacity = isArchived ? '0.6' : '1';
+
       const thumbHtml = d.photo
         ? `<img class="job-thumb" src="${d.photo}" alt="">`
         : `<div class="job-thumb-placeholder">🏠</div>`;
@@ -464,20 +467,62 @@
       const modifiedBadge = unreviewedCount > 0
         ? `<div class="modified-badge">⚠ ${unreviewedCount} unreviewed edit${unreviewedCount>1?'s':''}</div>`
         : '';
+      const contractorLine = (j.created_by === 'gmail-import' || j.created_by === 'one18cleaning@gmail.com')
+        ? '👤 ' + escapeHtml(j.assigned_to || d.assignedTo || 'Unassigned')
+        : 'By ' + escapeHtml(j.created_by || '');
+      const statusLabel = isArchived ? 'Archived' : j.status === 'submitted' ? 'Submitted' : 'In progress';
+
       card.innerHTML = `
         ${thumbHtml}
         <div class="job-info">
           <div class="jn">${escapeHtml(d.name || 'Untitled job')}</div>
-          <div class="jm">${escapeHtml(d.client || 'No client name')}${d.address ? ' · '+escapeHtml(d.address) : ''}</div>
-          <div class="jm">${j.created_by === 'one18cleaning@gmail.com' ? '👤 Assigned to: '+escapeHtml(j.assigned_to||d.assignedTo||'Unassigned') : 'By '+escapeHtml(j.created_by||'')}</div>
+          <div class="jm">${escapeHtml(d.client || 'No client')}${d.address ? ' · '+escapeHtml(d.address) : ''}</div>
+          <div class="jm">${contractorLine}${d.date ? ' · 📅 '+escapeHtml(d.date) : ''}</div>
           ${modifiedBadge}
+          <div class="card-actions">
+            <button class="card-btn ${isArchived?'unarchive':'archive'}">${isArchived?'Unarchive':'Archive'}</button>
+            <button class="card-btn delete">Delete</button>
+          </div>
         </div>
         <div class="job-side">
           <div class="pct">${pct}%</div>
-          <div class="status-pill ${j.status}">${j.status === 'submitted' ? 'Submitted' : 'In progress'}</div>
+          <div class="status-pill ${j.status}">${statusLabel}</div>
         </div>
       `;
-      card.onclick = ()=> openDetail(j);
+
+      card.addEventListener('click', e=>{
+        if(e.target.closest('.card-actions')) return;
+        openDetail(j);
+      });
+
+      card.querySelector(`.card-btn.${isArchived?'unarchive':'archive'}`).onclick = async e=>{
+        e.stopPropagation();
+        const newStatus = isArchived ? (d.submittedAt ? 'submitted' : 'in_progress') : 'archived';
+        try{
+          await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+            method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
+            body: JSON.stringify({ status: newStatus, archived_at: isArchived ? null : new Date().toISOString() })
+          });
+          j.status = newStatus;
+          toast(isArchived ? 'Job unarchived' : 'Job archived');
+          renderList();
+        }catch(err){ alert('Could not update job'); }
+      };
+
+      card.querySelector('.card-btn.delete').onclick = async e=>{
+        e.stopPropagation();
+        const name = d.name || d.client || 'this job';
+        if(!confirm(`Permanently delete "${escapeHtml(name)}"? This cannot be undone.`)) return;
+        try{
+          await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+            method:'DELETE', headers: authHeaders()
+          });
+          allJobs = allJobs.filter(x=>x.id !== j.id);
+          toast('Job deleted');
+          renderList();
+        }catch(err){ alert('Could not delete job'); }
+      };
+
       area.appendChild(card);
     });
   }
@@ -593,7 +638,8 @@
     const d = j.data || {};
     $('detailTitle').textContent = d.name || 'Untitled job';
     const dt = j.updated_at ? new Date(j.updated_at).toLocaleString() : '';
-    $('detailSub').textContent = `${j.created_by ? j.created_by+' · ' : ''}${j.status === 'submitted' ? 'Submitted' : 'In progress'}${dt ? ' · Updated '+dt : ''}`;
+    $('detailSub').textContent = `${j.created_by ? j.created_by+' · ' : ''}${j.status === 'submitted' ? 'Submitted' : j.status === 'archived' ? 'Archived' : 'In progress'}${dt ? ' · Updated '+dt : ''}`;
+    $('archiveJobBtn').textContent = j.status === 'archived' ? 'Unarchive' : 'Archive';
     $('saveStatus').textContent = '';
 
     const body = $('detailBody');
@@ -823,125 +869,6 @@
     renderList();
   };
 
-  /* ---------------- Gmail quote import ---------------- */
-  $('gmailImportBtn').onclick = ()=> $('gmailModal').style.display='flex';
-  $('gmailCloseBtn').onclick = ()=> $('gmailModal').style.display='none';
-  $('gmailModal').addEventListener('click', e=>{ if(e.target.id==='gmailModal') $('gmailModal').style.display='none'; });
-
-  $('gmailFetchBtn').onclick = async ()=>{
-    $('gmailFetchBtn').disabled = true;
-    $('gmailFetchBtn').textContent = 'Reading Gmail…';
-    $('gmailLoading').style.display = 'block';
-    $('gmailQuotesList').innerHTML = '';
-
-    try{
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages:[{
-            role:'user',
-            content:`Search Gmail for recent emails with subject containing "Quote Request" or "Quote Request Submission" received in the last 30 days. Read each email and extract the job details. Return ONLY a valid JSON array (no markdown, no preamble) with objects containing these exact keys: clientName, clientEmail, clientPhone, address, preferredDate (YYYY-MM-DD format), serviceLevel ("standard", "deep", or "move"), homeSize, addons (array of strings from: windows, baseboards, blinds, fans, cabinets, pethair, garage, patio, fridge, oven), notes, emailSubject. Map service types: "Initial Deep Cleaning" or "Deep Clean" → "deep", "Standard Recurring" or "Recurring" → "standard", "Move-In" or "Move-Out" or "Move" → "move". Map add-ons: "Cabinet Interiors" → "cabinets", "Extensive Pet Hair" → "pethair", "Garage Basic Clean" → "garage", "Patio / Porch Basic Clean" → "patio", "Inside Refrigerator" → "fridge", "Inside Oven" → "oven", "Interior Windows" → "windows", "Baseboards" → "baseboards", "Blinds" → "blinds", "Ceiling Fans" → "fans". If a field is missing, use an empty string or empty array.`
-          }],
-          mcp_servers:[{
-            type:'url',
-            url:'https://gmailmcp.googleapis.com/mcp/v1',
-            name:'gmail'
-          }]
-        })
-      });
-
-      const data = await response.json();
-      const textContent = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-      let quotes = [];
-      try{
-        const cleaned = textContent.replace(/```json|```/g,'').trim();
-        quotes = JSON.parse(cleaned);
-        if(!Array.isArray(quotes)) quotes = [quotes];
-      }catch(e){ throw new Error('Could not parse quote data from Gmail response'); }
-
-      $('gmailLoading').style.display = 'none';
-      if(quotes.length === 0){
-        $('gmailQuotesList').innerHTML = '<p style="color:var(--slate); font-size:13px; text-align:center; padding:20px 0;">No new quote emails found in the last 30 days.</p>';
-        return;
-      }
-
-      const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
-      const addonLabel = {windows:'Interior Windows', baseboards:'Baseboards', blinds:'Blinds', fans:'Ceiling Fans', cabinets:'Cabinet Interiors', pethair:'Pet Hair', garage:'Garage', patio:'Patio/Porch', fridge:'Inside Fridge', oven:'Inside Oven'};
-
-      quotes.forEach((q, idx)=>{
-        const card = document.createElement('div');
-        card.className = 'quote-card';
-        const addonStr = (q.addons||[]).map(a=>addonLabel[a]||a).join(', ') || 'None';
-        card.innerHTML = `
-          <div class="quote-card-head">${escapeHtml(q.clientName||'Unknown client')}</div>
-          <div class="quote-card-meta">
-            📍 ${escapeHtml(q.address||'—')}<br>
-            📅 ${escapeHtml(q.preferredDate||'—')} &nbsp;·&nbsp; 🏠 ${escapeHtml(q.homeSize||'—')}<br>
-            🧹 ${escapeHtml(svcLabel[q.serviceLevel]||q.serviceLevel||'—')}<br>
-            📧 ${escapeHtml(q.clientEmail||'—')} &nbsp;·&nbsp; 📞 ${escapeHtml(q.clientPhone||'—')}
-            ${q.notes ? '<br>💬 ' + escapeHtml(q.notes) : ''}
-          </div>
-          ${addonStr !== 'None' ? `<div class="quote-addons">Add-ons: ${escapeHtml(addonStr)}</div>` : ''}
-          <div class="quote-assign-row">
-            <input type="email" placeholder="Assign to contractor email" data-idx="${idx}">
-            <button data-idx="${idx}">Create Job</button>
-          </div>
-          <div class="quote-created" id="qcreated_${idx}" style="display:none;">✓ Job created and assigned</div>
-        `;
-        card.querySelector('button').onclick = async ()=>{
-          const input = card.querySelector('input');
-          const contractor = input.value.trim();
-          if(!contractor || !contractor.includes('@')){ alert('Enter a valid contractor email'); return; }
-          const btn = card.querySelector('button');
-          btn.disabled = true; btn.textContent = 'Creating…';
-          try{
-            const sections = {};
-            ['arrival','kitchen','bathrooms','bedrooms','living','floors','walkthrough','addons'].forEach(key=>{
-              if(key==='bathrooms'||key==='bedrooms'){
-                sections[key]=[{id:uid(),label:(key==='bathrooms'?'Bathroom':'Bedroom')+' 1',items:{},photos:[],itemPhotos:{},itemNotes:{}}];
-              }else if(key==='addons'){
-                const addonItems={};
-                (q.addons||[]).forEach(a=>{ addonItems[a]=false; });
-                sections[key]={items:addonItems};
-              }else{ sections[key]={items:{},photos:[],itemPhotos:{},itemNotes:{}}; }
-            });
-            const jobId = uid(); const now = Date.now();
-            const jobData = {
-              id:jobId, name:`${q.clientName||'Client'} — ${q.preferredDate||'TBD'}`,
-              client:q.clientName||'', date:q.preferredDate||'', address:q.address||'',
-              photo:null, serviceLevel:q.serviceLevel||'standard',
-              safetyAcknowledged:false, safetyAcknowledgedAt:null,
-              status:'in_progress', submittedAt:null,
-              createdBy:session.email, assignedTo:contractor,
-              clientEmail:q.clientEmail||'', clientPhone:q.clientPhone||'',
-              notes:q.notes||'', editLedger:[], sections, createdAt:now, updatedAt:now
-            };
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs`,{
-              method:'POST',
-              headers:{...authHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
-              body:JSON.stringify({id:jobId,data:jobData,status:'in_progress',created_by:session.email,assigned_to:contractor,updated_at:new Date(now).toISOString()})
-            });
-            if(!res.ok) throw new Error('Create failed: '+res.status);
-            $(`qcreated_${idx}`).style.display='block';
-            card.querySelector('.quote-assign-row').style.opacity='0.4';
-            btn.textContent='Created ✓';
-            await loadAllJobs(); renderList();
-          }catch(e){ btn.disabled=false; btn.textContent='Create Job'; alert('Could not create job: '+e.message); }
-        };
-        $('gmailQuotesList').appendChild(card);
-      });
-
-    }catch(e){
-      $('gmailLoading').style.display='none';
-      $('gmailQuotesList').innerHTML = `<p style="color:var(--red); font-size:13px; padding:10px 0;">Error: ${escapeHtml(e.message)}</p>`;
-    }finally{
-      $('gmailFetchBtn').disabled=false; $('gmailFetchBtn').textContent='Check Gmail for new quotes';
-    }
-  };
-
   /* ---------------- Create / assign job ---------------- */
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 
@@ -1021,6 +948,25 @@
     }finally{
       $('cjSaveBtn').disabled=false; $('cjSaveBtn').textContent='Create & Assign Job';
     }
+  };
+
+  $('archiveJobBtn').onclick = async ()=>{
+    if(!currentDetailJob) return;
+    const j = currentDetailJob;
+    const isArchived = j.status === 'archived';
+    const newStatus = isArchived ? (j.data && j.data.submittedAt ? 'submitted' : 'in_progress') : 'archived';
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+        method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
+        body: JSON.stringify({ status: newStatus, archived_at: isArchived ? null : new Date().toISOString() })
+      });
+      j.status = newStatus;
+      toast(isArchived ? 'Job unarchived' : 'Job archived');
+      $('detailOverlay').classList.remove('open');
+      currentDetailJob = null;
+      await loadAllJobs();
+      renderList();
+    }catch(e){ alert('Could not archive job'); }
   };
 
   $('saveJobBtn').onclick = async ()=>{
