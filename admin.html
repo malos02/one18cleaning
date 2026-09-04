@@ -241,6 +241,11 @@
   .tab-btn{ flex:1; padding:9px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); color:var(--slate); font-size:13px; font-weight:600; cursor:pointer; }
   .tab-btn.active{ background:var(--navy); border-color:var(--navy); color:#fff; }
 
+  .lightbox{position:fixed; inset:0; background:rgba(10,16,24,0.9); z-index:90; display:none; align-items:center; justify-content:center; padding:20px;}
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%; max-height:85vh; border-radius:10px;}
+  .lightbox-close{position:absolute; top:18px; right:18px; background:rgba(255,255,255,0.15); color:#fff; border:none; width:36px; height:36px; border-radius:50%; font-size:18px;}
+</style>
 </head>
 <body>
 
@@ -399,7 +404,7 @@
 
   const SUPABASE_URL = 'https://qbicdeyirtvavlkrarcy.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_pvN11J0EDjEVsuCvXHVung_3Eh2VjVj';
-  const ADMIN_EMAILS = ['one18cleaning@gmail.com','calebo2g@hotmail.com','edoi1794@gmail.com'];
+  const ADMIN_EMAILS = ['one18cleaning@gmail.com'];
   const SESSION_KEY = 'one18_admin_session';
 
   let session = null;
