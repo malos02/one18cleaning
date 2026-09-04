@@ -389,7 +389,33 @@
   .status-pill.in_progress{background:var(--cream); color:var(--slate); border:1px solid var(--line);}
 
   /* ---------- Safety gate & DO NOT list modal ---------- */
-  .safety-gate{
+  .history-sheet{
+    position:fixed; inset:0; background:rgba(20,30,45,0.6); z-index:60;
+    display:none; align-items:flex-end;
+  }
+  .history-sheet.open{display:flex;}
+  .history-inner{
+    background:var(--cream); width:100%; max-height:78vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:18px 16px 28px;
+  }
+  .history-inner h3{margin:0 0 14px; font-size:18px; font-family:'Fraunces',serif;}
+  .history-job-card{
+    background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:10px; cursor:pointer;
+    display:flex; align-items:center; gap:12px;
+  }
+  .history-job-card:active{border-color:var(--gold);}
+  .history-job-info{flex:1; min-width:0;}
+  .history-job-info .hjn{font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .history-job-info .hjm{font-size:12px; color:var(--slate); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .history-job-thumb{width:44px; height:44px; border-radius:9px; object-fit:cover; flex:none; background:var(--line);}
+  .history-job-thumb-placeholder{width:44px; height:44px; border-radius:9px; flex:none; background:var(--cream); border:1px dashed var(--line); display:flex; align-items:center; justify-content:center; font-size:16px;}
+  .back-to-current{
+    display:none; position:sticky; top:0; z-index:10;
+    background:var(--navy); color:#fff; width:100%; border:none;
+    padding:10px 16px; font-size:13px; font-weight:700; cursor:pointer; text-align:left;
+  }
+  .back-to-current.visible{display:block;}
     display:flex; align-items:center; gap:12px;
     background:var(--red-bg); border:1.5px solid var(--red);
     border-radius:var(--radius); padding:14px; margin-bottom:16px;
@@ -539,8 +565,8 @@
       <div class="tag">Cleaning With Purpose</div>
     </div>
     <button class="icon-btn" id="logoutBtn" style="margin-right:6px;">Log out</button>
-    <button class="icon-btn" id="settingsBtn">⚙</button>
-    <button class="icon-btn" id="newJobTopBtn" style="margin-left:6px;">+ New Job</button>
+    <button class="icon-btn" id="settingsBtn" style="margin-right:6px;">⚙</button>
+    <button class="icon-btn" id="historyBtn">📋 History</button>
   </div>
 
   <div class="job-line">
@@ -631,6 +657,16 @@
     <div class="safety-ack-wrap">
       <button class="safety-ack-btn" id="pwSaveBtn" style="background:var(--navy);">Save new password</button>
     </div>
+  </div>
+</div>
+
+<button class="back-to-current" id="backToCurrentBtn">← Back to current job</button>
+
+<div class="history-sheet" id="historySheet">
+  <div class="history-inner">
+    <h3>Past Jobs</h3>
+    <div id="historyList"></div>
+    <button style="display:block; margin:8px auto 0; background:none; border:none; color:var(--slate); font-size:13px; text-decoration:underline; cursor:pointer;" id="closeHistoryBtn">Close</button>
   </div>
 </div>
 
@@ -985,6 +1021,17 @@
         })
       });
       if(!res.ok) throw new Error(`Save failed: ${res.status}`);
+
+      // Check if admin has archived/removed this job
+      const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(current.id)}&select=status,data->>removedByAdmin`, { headers: authHeaders() });
+      if(checkRes.ok){
+        const rows = await checkRes.json();
+        if(rows.length && (rows[0].status === 'archived' || rows[0].removedByAdmin === 'true')){
+          showJobRemovedNotice();
+          return;
+        }
+      }
+
       const idx = jobsIndex.find(j=>j.id===current.id);
       if(idx){
         idx.name = current.name || 'Untitled job';
@@ -993,6 +1040,76 @@
         idx.status = current.status || 'in_progress';
       }
     }catch(e){ console.error('Save failed', e); toast('Could not save — check your connection'); }
+  }
+
+  function showJobRemovedNotice(){
+    current = null;
+    showWaitingScreen('Job Removed', 'This job has been removed by the office. Please contact your manager if you have any questions.');
+  }
+
+  function showWaitingScreen(title, message){
+    // Remove any existing waiting screen
+    const existing = document.getElementById('waitingScreen');
+    if(existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'waitingScreen';
+    overlay.style.cssText = 'position:fixed;inset:0;background:var(--cream);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;';
+    overlay.innerHTML = `
+      <div style="font-size:44px;margin-bottom:16px;">🏠</div>
+      <h2 style="font-family:\'Fraunces\',serif;color:var(--navy);margin:0 0 10px;font-size:22px;">${title}</h2>
+      <p style="color:var(--slate);font-size:14px;line-height:1.6;margin:0 0 28px;max-width:280px;">${message}</p>
+      <div style="font-size:12px;color:var(--slate);margin-bottom:6px;" id="waitingStatus">Checking for assigned jobs…</div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Poll every 30s for a newly assigned job
+    let pollCount = 0;
+    const poll = async ()=>{
+      pollCount++;
+      const el = document.getElementById('waitingStatus');
+      if(el) el.textContent = 'Checking for assigned jobs…';
+      await loadJobsIndex();
+      const activeJobs = jobsIndex.filter(j=>j.status !== 'archived');
+      if(activeJobs.length){
+        // Found an assigned job — load it
+        overlay.remove();
+        const mostRecent = activeJobs.sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+        const job = await loadJob(mostRecent.id);
+        if(job && !job.removedByAdmin){
+          current = job;
+          render();
+          toast('New job assigned — ready to start');
+          return;
+        }
+      }
+      if(el) el.textContent = `No jobs assigned yet · checking again in 30s`;
+      setTimeout(poll, 30000);
+    };
+    setTimeout(poll, 3000); // First check after 3s
+  }
+
+  async function boot(){
+    await loadJobsIndex();
+    const activeJobs = jobsIndex.filter(j=>j.status !== 'archived');
+
+    if(activeJobs.length){
+      const mostRecent = activeJobs.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+      const job = await loadJob(mostRecent.id);
+      if(job && job.removedByAdmin){
+        showJobRemovedNotice();
+        return;
+      }
+      current = job || null;
+      if(!current){
+        showWaitingScreen('No Jobs Assigned', 'The office will assign you a job. This page checks automatically every 30 seconds.');
+        return;
+      }
+    } else {
+      showWaitingScreen('No Jobs Assigned', 'The office will assign you a job. This page checks automatically every 30 seconds.');
+      return;
+    }
+    render();
   }
   async function deleteJobRemote(id){
     try{
@@ -1266,6 +1383,38 @@
         }
         scheduleSave(); render();
         toast('Job submitted to the office');
+
+        // Notify admin
+        const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+        fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            secret: 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg',
+            to: 'one18cleaning@gmail.com',
+            subject: `✅ Job Submitted — ${current.client || current.name || 'New job'}`,
+            html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;">
+              <div style="background:#16283F;padding:24px;text-align:center;">
+                <div style="color:#C79A5D;font-size:20px;font-weight:700;">ONE:18 CLEANING</div>
+                <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;">ADMIN NOTIFICATION</div>
+              </div>
+              <div style="padding:28px 24px;background:#FAF6EE;">
+                <h2 style="margin:0 0 16px;font-size:19px;color:#20303F;">Job Submitted for Review</h2>
+                <div style="background:#fff;border:1.5px solid #E4DCCB;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+                  <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Contractor: </span><strong>${session.email}</strong></div>
+                  ${current.client?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Client: </span><strong>${current.client}</strong></div>`:''}
+                  ${current.address?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Address: </span><strong>${current.address}</strong></div>`:''}
+                  ${current.date?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Date: </span><strong>${current.date}</strong></div>`:''}
+                  <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabel[current.serviceLevel]||current.serviceLevel||'Standard'}</strong></div>
+                  <div style="margin-bottom:16px;"><span style="color:#6B7A8C;">Completion: </span><strong>${computeOverallPct().pct}%</strong></div>
+                  <a href="https://malos02.github.io/one18cleaning/admin.html" style="display:block;background:#16283F;color:#fff;text-align:center;padding:11px;border-radius:9px;text-decoration:none;font-weight:700;font-size:14px;">Review in Admin Dashboard →</a>
+                </div>
+              </div>
+              <div style="background:#16283F;padding:12px 24px;text-align:center;">
+                <div style="color:rgba(255,255,255,0.5);font-size:11px;">One:18 Cleaning • Cleaning With Purpose</div>
+              </div>
+            </div>`
+          })
+        }).catch(e=>console.error('Admin email failed:',e));
       };
       area.appendChild(btn);
     }
@@ -1782,12 +1931,61 @@
   };
   $('pwConfirm').addEventListener('keydown', e=>{ if(e.key==='Enter') $('pwSaveBtn').click(); });
 
-  /* ---------------- New Job button ---------------- */
-  $('newJobTopBtn').onclick = async ()=>{
-    if(!confirm('Start a new job? Your current job is already saved.')) return;
-    await startNewJob();
+  /* ---------------- History (past submitted jobs) ---------------- */
+  let viewingHistoryJob = false;
+
+  $('historyBtn').onclick = async ()=>{
+    const list = $('historyList');
+    list.innerHTML = '';
+    // Load all jobs and filter to submitted
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,updated_at&order=updated_at.desc`, { headers: authHeaders() });
+    if(!res.ok){ toast('Could not load history'); return; }
+    const rows = await res.json();
+    const submitted = rows.filter(r => r.status === 'submitted');
+    if(!submitted.length){
+      list.innerHTML = '<p style="color:var(--slate); font-size:13px; text-align:center; padding:20px 0;">No submitted jobs yet.</p>';
+    } else {
+      submitted.forEach(r=>{
+        const d = r.data || {};
+        const card = document.createElement('div');
+        card.className = 'history-job-card';
+        const thumb = d.photo
+          ? `<img class="history-job-thumb" src="${d.photo}" alt="">`
+          : `<div class="history-job-thumb-placeholder">🏠</div>`;
+        card.innerHTML = `
+          ${thumb}
+          <div class="history-job-info">
+            <div class="hjn">${escapeHtml(d.name || d.client || 'Untitled job')}</div>
+            <div class="hjm">${escapeHtml(d.client || '')}${d.address ? ' · '+escapeHtml(d.address) : ''}${d.date ? ' · '+escapeHtml(d.date) : ''}</div>
+          </div>
+          <div style="font-size:11px; font-weight:700; color:var(--green); flex:none;">✓ Done</div>
+        `;
+        card.onclick = ()=>{
+          $('historySheet').classList.remove('open');
+          // Load this job as read-only view
+          const savedCurrent = current;
+          current = d;
+          viewingHistoryJob = true;
+          $('backToCurrentBtn').classList.add('visible');
+          render();
+        };
+        list.appendChild(card);
+      });
+    }
+    $('historySheet').classList.add('open');
   };
 
+  $('closeHistoryBtn').onclick = ()=> $('historySheet').classList.remove('open');
+  $('historySheet').addEventListener('click', e=>{ if(e.target.id==='historySheet') $('historySheet').classList.remove('open'); });
+
+  $('backToCurrentBtn').onclick = ()=>{
+    viewingHistoryJob = false;
+    $('backToCurrentBtn').classList.remove('visible');
+    if(current && current.id) render();
+    else boot();
+  };
+
+  /* ---------------- New Job button (admin-only — removed from contractor UI) ---------------- */
   async function switchToJob(id){
     const job = await loadJob(id);
     if(job){ current = job; expandedKeys = new Set([SCHEMA[0].key]); render(); toast('Job loaded'); }
@@ -1805,9 +2003,15 @@
   /* ---------------- Boot ---------------- */
   async function boot(){
     await loadJobsIndex();
-    if(jobsIndex.length){
-      const mostRecent = jobsIndex.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+    // Filter out removed/archived jobs from the index
+    const activeJobs = jobsIndex.filter(j => j.status !== 'archived');
+    if(activeJobs.length){
+      const mostRecent = activeJobs.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
       const job = await loadJob(mostRecent.id);
+      if(job && job.removedByAdmin){
+        showJobRemovedNotice();
+        return;
+      }
       current = job || newJob('');
     } else {
       current = newJob('');
