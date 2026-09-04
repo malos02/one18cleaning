@@ -539,7 +539,8 @@
       <div class="tag">Cleaning With Purpose</div>
     </div>
     <button class="icon-btn" id="logoutBtn" style="margin-right:6px;">Log out</button>
-    <button class="icon-btn" id="newJobTopBtn">+ New Job</button>
+    <button class="icon-btn" id="settingsBtn">⚙</button>
+    <button class="icon-btn" id="newJobTopBtn" style="margin-left:6px;">+ New Job</button>
   </div>
 
   <div class="job-line">
@@ -605,6 +606,32 @@
 <div class="lightbox" id="lightbox">
   <button class="lightbox-close" id="lightboxClose">✕</button>
   <img id="lightboxImg" src="" alt="Job photo">
+</div>
+
+<div class="safety-modal" id="pwModal">
+  <div class="safety-sheet" style="max-height:60vh;">
+    <div class="safety-sheet-header">
+      <div>
+        <h3>Change Password</h3>
+        <div class="sub" id="pwUserEmail"></div>
+      </div>
+      <button class="safety-close-x" id="pwCloseBtn">✕</button>
+    </div>
+    <div class="safety-content" style="padding:20px 16px;">
+      <div class="login-field">
+        <label>New password</label>
+        <input type="password" id="pwNew" placeholder="Enter new password" autocomplete="new-password">
+      </div>
+      <div class="login-field">
+        <label>Confirm new password</label>
+        <input type="password" id="pwConfirm" placeholder="Confirm new password" autocomplete="new-password">
+      </div>
+      <div class="login-error" id="pwError"></div>
+    </div>
+    <div class="safety-ack-wrap">
+      <button class="safety-ack-btn" id="pwSaveBtn" style="background:var(--navy);">Save new password</button>
+    </div>
+  </div>
 </div>
 
 <div class="safety-modal" id="safetyModal">
@@ -908,7 +935,7 @@
     try{
       const email = encodeURIComponent(session.email);
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at&created_by=eq.${email}&order=updated_at.desc`,
+        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at&or=(created_by.eq.${email},assigned_to.eq.${email})&order=updated_at.desc`,
         { headers: authHeaders() }
       );
       if(!res.ok) throw new Error(`List failed: ${res.status}`);
@@ -925,7 +952,7 @@
     try{
       const email = encodeURIComponent(session.email);
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&created_by=eq.${email}&select=data`,
+        `${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&or=(created_by.eq.${email},assigned_to.eq.${email})&select=data`,
         { headers: authHeaders() }
       );
       if(!res.ok) throw new Error(`Load failed: ${res.status}`);
@@ -1720,6 +1747,42 @@
   document.querySelectorAll('#serviceToggle button').forEach(btn=>{
     btn.onclick = ()=>{ current.serviceLevel = btn.dataset.level; scheduleSave(); render(); };
   });
+
+  /* ---------------- Settings / password change ---------------- */
+  $('settingsBtn').onclick = ()=>{
+    $('pwUserEmail').textContent = session ? session.email : '';
+    $('pwNew').value = ''; $('pwConfirm').value = '';
+    $('pwError').classList.remove('show');
+    $('pwModal').classList.add('open');
+  };
+  $('pwCloseBtn').onclick = ()=> $('pwModal').classList.remove('open');
+  $('pwModal').addEventListener('click', e=>{ if(e.target.id==='pwModal') $('pwModal').classList.remove('open'); });
+  $('pwSaveBtn').onclick = async ()=>{
+    const np = $('pwNew').value;
+    const cp = $('pwConfirm').value;
+    const err = $('pwError');
+    err.classList.remove('show');
+    if(!np){ err.textContent='Enter a new password'; err.classList.add('show'); return; }
+    if(np.length < 6){ err.textContent='Password must be at least 6 characters'; err.classList.add('show'); return; }
+    if(np !== cp){ err.textContent='Passwords do not match'; err.classList.add('show'); return; }
+    $('pwSaveBtn').disabled = true; $('pwSaveBtn').textContent = 'Saving…';
+    try{
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method:'PUT',
+        headers:{ 'apikey':SUPABASE_KEY, 'Authorization':`Bearer ${session.access_token}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ password: np })
+      });
+      if(!res.ok){ const b=await res.json(); throw new Error(b.msg||b.error_description||'Failed'); }
+      $('pwModal').classList.remove('open');
+      toast('Password updated successfully');
+    }catch(e){
+      err.textContent = e.message || 'Could not update password';
+      err.classList.add('show');
+    }finally{
+      $('pwSaveBtn').disabled = false; $('pwSaveBtn').textContent = 'Save new password';
+    }
+  };
+  $('pwConfirm').addEventListener('keydown', e=>{ if(e.key==='Enter') $('pwSaveBtn').click(); });
 
   /* ---------------- New Job button ---------------- */
   $('newJobTopBtn').onclick = async ()=>{
