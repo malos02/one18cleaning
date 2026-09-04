@@ -974,10 +974,10 @@
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 
   /* ---------------- Storage helpers (Supabase) ---------------- */
-  async function loadJobsIndex(){
+  async function loadJobsIndex(retrying = false){
     try{
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at&order=updated_at.desc`,
+        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at,status&order=updated_at.desc`,
         { headers: authHeaders() }
       );
       if(!res.ok) throw new Error(`List failed: ${res.status}`);
@@ -986,9 +986,18 @@
         id: r.id,
         name: (r.data && r.data.name) || '',
         updatedAt: new Date(r.updated_at).getTime(),
-        pct: r.data ? computePctForJob(r.data).pct : 0
+        pct: r.data ? computePctForJob(r.data).pct : 0,
+        status: r.status
       }));
-    }catch(e){ console.error('Could not load jobs list', e); jobsIndex = []; toast('Could not reach the server'); }
+    }catch(e){
+      if(!retrying){
+        // Silent retry after 2 seconds — session may not be ready yet on first load
+        await new Promise(r=>setTimeout(r,2000));
+        return loadJobsIndex(true);
+      }
+      console.error('Could not load jobs list', e);
+      jobsIndex = [];
+    }
   }
   async function loadJob(id){
     try{
