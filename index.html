@@ -83,24 +83,24 @@
   .icon-btn:active{background:rgba(255,255,255,0.18);}
 
   .job-line{
-    margin-top:14px;
+    margin-top:10px;
     display:flex; align-items:baseline; justify-content:space-between; gap:8px;
   }
   .job-title-input{
     background:transparent; border:none; color:#fff;
-    font-family:'Fraunces',serif; font-size:19px; font-weight:600;
+    font-family:'Fraunces',serif; font-size:17px; font-weight:600;
     width:100%; padding:0; outline:none;
   }
-  .job-title-input::placeholder{color:rgba(255,255,255,0.45);}
+  .job-title-input::placeholder{color:rgba(255,255,255,0.4);}
   .job-meta{
-    font-size:11.5px; color:rgba(255,255,255,0.6); margin-top:2px;
+    font-size:11px; color:rgba(255,255,255,0.55); margin-top:1px;
   }
 
   .property-photo-row{
-    display:flex; align-items:center; gap:10px; margin-top:12px;
+    display:flex; align-items:center; gap:10px; margin-top:8px;
   }
   .property-photo-thumb{
-    width:52px; height:52px; border-radius:10px; overflow:hidden; position:relative; flex:none;
+    width:44px; height:44px; border-radius:9px; overflow:hidden; position:relative; flex:none;
     border:1px solid rgba(255,255,255,0.25);
   }
   .property-photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
@@ -110,15 +110,15 @@
     cursor:pointer; display:flex; align-items:center; justify-content:center;
   }
   .property-photo-add{
-    width:52px; height:52px; border-radius:10px; border:1.5px dashed rgba(255,255,255,0.4);
+    width:44px; height:44px; border-radius:9px; border:1.5px dashed rgba(255,255,255,0.4);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     color:rgba(255,255,255,0.75); font-size:9px; cursor:pointer; flex:none; gap:1px;
   }
-  .property-photo-add span.plus{font-size:16px; line-height:1; color:var(--gold-light);}
-  .property-photo-text{font-size:11.5px; color:rgba(255,255,255,0.65); line-height:1.3;}
-  .property-photo-text strong{color:#fff; font-weight:600; display:block; font-size:12.5px;}
+  .property-photo-add span.plus{font-size:15px; line-height:1; color:var(--gold-light);}
+  .property-photo-text{font-size:11px; color:rgba(255,255,255,0.6); line-height:1.3;}
+  .property-photo-text strong{color:rgba(255,255,255,0.85); font-weight:600; display:block; font-size:12px;}
 
-  .progress-wrap{margin-top:12px;}
+  .progress-wrap{margin-top:10px;}
   .progress-labels{
     display:flex; justify-content:space-between;
     font-size:11px; color:rgba(255,255,255,0.7); margin-bottom:5px;
@@ -450,8 +450,8 @@
   }
 
   .locked-msg{
-    text-align:center; color:var(--slate); font-size:13px; padding:30px 20px;
-    border:1.5px dashed var(--line); border-radius:var(--radius); background:var(--paper);
+    text-align:center; color:var(--slate); font-size:12.5px; padding:16px 20px;
+    font-style:italic; opacity:0.8;
   }
 
   .safety-modal{
@@ -577,7 +577,7 @@
   </div>
 
   <div class="job-line">
-    <input class="job-title-input" id="jobNameInput" placeholder="Untitled job — tap to name" />
+    <input class="job-title-input" id="jobNameInput" placeholder="Job name" />
   </div>
   <div class="job-meta" id="jobMetaLine">New job · not saved yet</div>
 
@@ -1311,7 +1311,7 @@
     $('addressInput').value = current.address || '';
     $('jobMetaLine').textContent = current.client
       ? `${current.client}${current.address ? ' · '+current.address : ''}`
-      : 'New job · tap "Job details" to add client & address';
+      : 'No client details yet — check with the office';
 
     renderPropertyPhotoRow();
     renderSafetyGate();
@@ -1337,7 +1337,7 @@
     if(!current.safetyAcknowledged){
       const locked = document.createElement('div');
       locked.className = 'locked-msg';
-      locked.textContent = 'Review the chemical & surface DO NOT list above to unlock this job’s checklist.';
+      locked.textContent = 'Complete the safety review above to unlock the checklist.';
       root.appendChild(locked);
     } else {
       SCHEMA.forEach(sec => root.appendChild(renderSection(sec)));
@@ -1867,7 +1867,7 @@
       row.appendChild(addTile);
       const text = document.createElement('div');
       text.className = 'property-photo-text';
-      text.innerHTML = `<strong>Add a property photo</strong>Helps identify the job at a glance`;
+      text.innerHTML = `<strong>Add photo</strong>Tap to photograph the property`;
       row.appendChild(text);
     }
   }
