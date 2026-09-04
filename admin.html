@@ -76,6 +76,7 @@
     padding:2px 7px; border-radius:20px;
   }
   .status-pill.submitted{background:var(--green-bg); color:var(--green); border:1px solid var(--green);}
+  .status-pill.approved{background:#E8F4FF; color:#1A6B9A; border:1px solid #1A6B9A;}
   .status-pill.in_progress{background:var(--cream); color:var(--slate); border:1px solid var(--line);}
   .status-pill.archived{background:#F0F0F0; color:#888; border:1px solid #CCC;}
   .card-actions{display:flex; gap:5px; margin-top:8px; padding-top:8px; border-top:1px solid #F1EDE2;}
@@ -326,6 +327,7 @@
       <select id="statusFilter">
         <option value="active" selected>All active jobs</option>
         <option value="submitted">Submitted</option>
+        <option value="approved">Approved ✓</option>
         <option value="in_progress">In progress</option>
         <option value="archived">Archived</option>
       </select>
@@ -388,7 +390,8 @@
   <div class="save-bar" id="saveBar" style="display:none;">
     <button class="delete-btn" id="deleteJobBtn">Delete</button>
     <button class="delete-btn" id="archiveJobBtn" style="background:var(--cream); color:var(--slate); border-color:var(--slate);">Archive</button>
-    <button class="save-btn" id="saveJobBtn">Save changes</button>
+    <button class="save-btn" id="approveJobBtn" style="display:none; background:var(--green);">✓ Approve</button>
+    <button class="save-btn" id="saveJobBtn">Save</button>
   </div>
   <div class="save-status" id="saveStatus"></div>
 </div>
@@ -531,6 +534,7 @@
       if(statusF === 'active' && isArchived) return false;
       if(statusF === 'archived' && !isArchived) return false;
       if(statusF === 'submitted' && j.status !== 'submitted') return false;
+      if(statusF === 'approved' && j.status !== 'approved') return false;
       if(statusF === 'in_progress' && j.status !== 'in_progress') return false;
       if(q){
         const hay = [d.name, d.client, d.address, d.clientEmail, d.clientPhone,
@@ -564,7 +568,7 @@
       const contractorLine = (j.created_by === 'gmail-import' || j.created_by === 'one18cleaning@gmail.com')
         ? '👤 ' + escapeHtml(j.assigned_to || d.assignedTo || 'Unassigned')
         : 'By ' + escapeHtml(j.created_by || '');
-      const statusLabel = isArchived ? 'Archived' : j.status === 'submitted' ? 'Submitted' : 'In progress';
+      const statusLabel = isArchived ? 'Archived' : j.status === 'approved' ? 'Approved ✓' : j.status === 'submitted' ? 'Submitted' : 'In Progress';
 
       card.innerHTML = `
         <div class="job-card-top">
@@ -614,13 +618,28 @@
       card.querySelector('.card-btn.delete').onclick = async e=>{
         e.stopPropagation();
         const name = d.name || d.client || 'this job';
-        if(!confirm(`Permanently delete "${escapeHtml(name)}"? This cannot be undone.`)) return;
+        const isAssigned = !!(j.assigned_to || d.assignedTo);
+        const confirmMsg = isAssigned
+          ? `"${escapeHtml(name)}" is assigned to a contractor. It will be archived and they'll see a removal notice. Continue?`
+          : `Permanently delete "${escapeHtml(name)}"? This cannot be undone.`;
+        if(!confirm(confirmMsg)) return;
         try{
-          await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
-            method:'DELETE', headers: authHeaders()
-          });
-          allJobs = allJobs.filter(x=>x.id !== j.id);
-          toast('Job deleted');
+          if(isAssigned){
+            // Archive with removal flag so contractor sees notice
+            if(d) d.removedByAdmin = true;
+            await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+              method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
+              body: JSON.stringify({ status:'archived', archived_at: new Date().toISOString(), data: d })
+            });
+            j.status = 'archived';
+            toast('Job archived — contractor will be notified');
+          } else {
+            await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+              method:'DELETE', headers: authHeaders()
+            });
+            allJobs = allJobs.filter(x=>x.id !== j.id);
+            toast('Job deleted');
+          }
           renderList();
         }catch(err){ alert('Could not delete job'); }
       };
@@ -740,8 +759,10 @@
     const d = j.data || {};
     $('detailTitle').textContent = d.name || 'Untitled job';
     const dt = j.updated_at ? new Date(j.updated_at).toLocaleString() : '';
-    $('detailSub').textContent = `${j.created_by ? j.created_by+' · ' : ''}${j.status === 'submitted' ? 'Submitted' : j.status === 'archived' ? 'Archived' : 'In progress'}${dt ? ' · Updated '+dt : ''}`;
+    $('detailSub').textContent = `${j.created_by ? j.created_by+' · ' : ''}${j.status === 'approved' ? 'Approved ✓' : j.status === 'submitted' ? 'Submitted' : j.status === 'archived' ? 'Archived' : 'In Progress'}${dt ? ' · Updated '+dt : ''}`;
     $('archiveJobBtn').textContent = j.status === 'archived' ? 'Unarchive' : 'Archive';
+    $('approveJobBtn').style.display = j.status === 'submitted' ? 'block' : 'none';
+    $('saveJobBtn').textContent = 'Save';
     $('saveStatus').textContent = '';
 
     const body = $('detailBody');
@@ -1342,6 +1363,62 @@
     }
   };
 
+  $('approveJobBtn').onclick = async ()=>{
+    if(!currentDetailJob) return;
+    const j = currentDetailJob;
+    const d = j.data || {};
+    const contractorEmail = j.assigned_to || d.assignedTo || d.createdBy;
+    if(!contractorEmail){ alert('No contractor assigned to this job.'); return; }
+    if(!confirm(`Approve this job and notify ${contractorEmail}?`)) return;
+
+    try{
+      d.approvedAt = Date.now();
+      d.status = 'approved';
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+        method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
+        body: JSON.stringify({ status:'approved', approved_at: new Date().toISOString(), data: d })
+      });
+      if(!res.ok) throw new Error('Could not approve');
+      j.status = 'approved';
+
+      // Send approval email to contractor
+      const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+      await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          secret: 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg',
+          to: contractorEmail,
+          subject: `🎉 Job Approved — ${d.client || d.name || 'Your job'}`,
+          html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;">
+            <div style="background:#16283F;padding:24px;text-align:center;">
+              <div style="color:#C79A5D;font-size:20px;font-weight:700;">ONE:18 CLEANING</div>
+            </div>
+            <div style="padding:28px 24px;background:#FAF6EE;">
+              <h2 style="margin:0 0 8px;font-size:20px;color:#20303F;">Great work — Job Approved! 🎉</h2>
+              <p style="margin:0 0 20px;color:#6B7A8C;font-size:14px;line-height:1.6;">Your job has been reviewed and approved. Payment will be processed accordingly.</p>
+              <div style="background:#fff;border:1.5px solid #E4DCCB;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+                ${d.client?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Client: </span><strong>${d.client}</strong></div>`:''}
+                ${d.address?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Address: </span><strong>${d.address}</strong></div>`:''}
+                ${d.date?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Date: </span><strong>${d.date}</strong></div>`:''}
+                <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabel[d.serviceLevel]||d.serviceLevel||'Standard'}</strong></div>
+                <div style="margin-top:12px;background:#EAF2ED;border-radius:8px;padding:10px 14px;color:#4B7A5E;font-weight:700;font-size:14px;">✓ Approved on ${new Date().toLocaleDateString()}</div>
+              </div>
+              <p style="font-size:12.5px;color:#6B7A8C;">If you have any questions about payment, please contact the office directly.</p>
+            </div>
+            <div style="background:#16283F;padding:12px 24px;text-align:center;">
+              <div style="color:rgba(255,255,255,0.5);font-size:11px;">One:18 Cleaning • Cleaning With Purpose</div>
+            </div>
+          </div>`
+        })
+      });
+
+      toast('Job approved — contractor notified by email');
+      renderDetail();
+      await loadAllJobs();
+      renderList();
+    }catch(e){ alert('Could not approve job: ' + e.message); }
+  };
+
   $('archiveJobBtn').onclick = async ()=>{
     if(!currentDetailJob) return;
     const j = currentDetailJob;
@@ -1398,16 +1475,32 @@
   $('deleteJobBtn').onclick = async ()=>{
     if(!currentDetailJob) return;
     const j = currentDetailJob;
-    const name = (j.data && j.data.name) || 'Untitled job';
-    if(!confirm(`Delete "${name}"? This can't be undone.`)) return;
+    const d = j.data || {};
+    const name = d.name || d.client || 'Untitled job';
+    const isAssigned = !!(j.assigned_to || d.assignedTo);
+    const confirmMsg = isAssigned
+      ? `"${name}" is assigned to a contractor. It will be archived and they'll see a removal notice. Continue?`
+      : `Permanently delete "${name}"? This can't be undone.`;
+    if(!confirm(confirmMsg)) return;
     try{
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
-        method:'DELETE', headers: authHeaders()
-      });
-      if(!res.ok) throw new Error('Delete failed: '+res.status);
-      allJobs = allJobs.filter(x=>x.id !== j.id);
+      if(isAssigned){
+        d.removedByAdmin = true;
+        await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+          method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'},
+          body: JSON.stringify({ status:'archived', archived_at: new Date().toISOString(), data: d })
+        });
+        toast('Job archived — contractor will be notified');
+      } else {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(j.id)}`, {
+          method:'DELETE', headers: authHeaders()
+        });
+        if(!res.ok) throw new Error('Delete failed: '+res.status);
+        allJobs = allJobs.filter(x=>x.id !== j.id);
+        toast('Job deleted');
+      }
       currentDetailJob = null;
       $('detailOverlay').classList.remove('open');
+      await loadAllJobs();
       renderList();
     }catch(e){
       console.error(e);
