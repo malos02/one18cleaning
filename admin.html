@@ -123,6 +123,16 @@
   .save-btn{flex:1; background:var(--green); color:#fff; border:none; border-radius:10px; padding:12px; font-size:14px; font-weight:700;}
   .save-btn:disabled{opacity:0.6;}
   .delete-btn{background:var(--red-bg); color:var(--red); border:1px solid var(--red); border-radius:10px; padding:12px 16px; font-size:13px; font-weight:700;}
+  .quote-card{
+    border:1.5px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; background:var(--cream);
+  }
+  .quote-card-head{font-weight:700; font-size:14px; margin-bottom:4px;}
+  .quote-card-meta{font-size:12px; color:var(--slate); margin-bottom:10px; line-height:1.6;}
+  .quote-addons{font-size:11.5px; color:var(--navy); background:#EEF2F9; border-radius:6px; padding:4px 8px; margin-bottom:10px; font-weight:600;}
+  .quote-assign-row{display:flex; gap:8px; align-items:center;}
+  .quote-assign-row input{flex:1; border:1.3px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; font-family:'Inter',sans-serif;}
+  .quote-assign-row button{background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer; flex:none;}
+  .quote-created{color:var(--green); font-size:12px; font-weight:700; padding:6px 0;}
   .modified-badge{
     font-size:10.5px; color:var(--red); font-weight:600; margin-top:3px;
     background:var(--red-bg); border-radius:6px; padding:2px 7px; display:inline-block;
@@ -215,7 +225,66 @@
     <div class="name">One:18 Cleaning</div>
     <div class="tag">Admin Dashboard</div>
   </div>
+  <button class="icon-btn" id="gmailImportBtn" style="margin-right:6px;">📧 Quotes</button>
+  <button class="icon-btn" id="createJobBtn" style="margin-right:6px;">+ Job</button>
   <button class="icon-btn" id="logoutBtn">Log out</button>
+</div>
+
+<!-- Gmail Import Modal -->
+<div class="login-gate" id="gmailModal" style="display:none; background:rgba(20,30,45,0.7); align-items:flex-end;">
+  <div style="background:var(--paper); width:100%; max-width:640px; border-radius:18px 18px 0 0; padding:20px 18px 28px; max-height:90vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0; font-size:18px;">📧 Import from Gmail</h3>
+        <div style="font-size:12px; color:var(--slate); margin-top:2px;">Recent quote request emails</div>
+      </div>
+      <button id="gmailCloseBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--slate);">✕</button>
+    </div>
+    <div id="gmailLoading" style="text-align:center; padding:30px; color:var(--slate); display:none;">
+      <div style="font-size:24px; margin-bottom:8px;">⏳</div>
+      Reading quote emails…
+    </div>
+    <div id="gmailQuotesList"></div>
+    <button id="gmailFetchBtn" class="login-btn" style="margin-top:8px;">Check Gmail for new quotes</button>
+  </div>
+</div>
+<div class="login-gate" id="createJobModal" style="display:none; background:rgba(20,30,45,0.7); align-items:flex-end;">
+  <div style="background:var(--paper); width:100%; max-width:640px; border-radius:18px 18px 0 0; padding:20px 18px 28px; max-height:90vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:18px;">Assign New Job</h3>
+      <button id="createJobCloseBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--slate);">✕</button>
+    </div>
+    <div class="login-field">
+      <label>Assign to contractor (email)</label>
+      <input type="email" id="cjContractor" placeholder="e.g. calebo2g@hotmail.com">
+    </div>
+    <div class="login-field">
+      <label>Client name</label>
+      <input type="text" id="cjClient" placeholder="e.g. John Smith">
+    </div>
+    <div class="login-field">
+      <label>Property address</label>
+      <input type="text" id="cjAddress" placeholder="Street, city">
+    </div>
+    <div class="login-field">
+      <label>Service date</label>
+      <input type="date" id="cjDate">
+    </div>
+    <div class="login-field">
+      <label>Service level</label>
+      <select id="cjServiceLevel" style="width:100%; border:1.3px solid var(--line); border-radius:9px; padding:10px 11px; font-size:14px; background:#FCFAF4;">
+        <option value="standard">Standard Clean</option>
+        <option value="deep">Deep Clean</option>
+        <option value="move">Move-In / Move-Out</option>
+      </select>
+    </div>
+    <div class="login-field">
+      <label>Job name / reference (optional)</label>
+      <input type="text" id="cjName" placeholder="e.g. Smith Residence - Aug 2026">
+    </div>
+    <div class="login-error" id="cjError"></div>
+    <button class="login-btn" id="cjSaveBtn" style="margin-top:8px;">Create & Assign Job</button>
+  </div>
 </div>
 
 <main>
@@ -400,7 +469,7 @@
         <div class="job-info">
           <div class="jn">${escapeHtml(d.name || 'Untitled job')}</div>
           <div class="jm">${escapeHtml(d.client || 'No client name')}${d.address ? ' · '+escapeHtml(d.address) : ''}</div>
-          <div class="jm">${j.created_by ? 'By '+escapeHtml(j.created_by) : ''}</div>
+          <div class="jm">${j.created_by === 'one18cleaning@gmail.com' ? '👤 Assigned to: '+escapeHtml(j.assigned_to||d.assignedTo||'Unassigned') : 'By '+escapeHtml(j.created_by||'')}</div>
           ${modifiedBadge}
         </div>
         <div class="job-side">
@@ -752,6 +821,206 @@
     $('detailOverlay').classList.remove('open');
     currentDetailJob = null;
     renderList();
+  };
+
+  /* ---------------- Gmail quote import ---------------- */
+  $('gmailImportBtn').onclick = ()=> $('gmailModal').style.display='flex';
+  $('gmailCloseBtn').onclick = ()=> $('gmailModal').style.display='none';
+  $('gmailModal').addEventListener('click', e=>{ if(e.target.id==='gmailModal') $('gmailModal').style.display='none'; });
+
+  $('gmailFetchBtn').onclick = async ()=>{
+    $('gmailFetchBtn').disabled = true;
+    $('gmailFetchBtn').textContent = 'Reading Gmail…';
+    $('gmailLoading').style.display = 'block';
+    $('gmailQuotesList').innerHTML = '';
+
+    try{
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages:[{
+            role:'user',
+            content:`Search Gmail for recent emails with subject containing "Quote Request" or "Quote Request Submission" received in the last 30 days. Read each email and extract the job details. Return ONLY a valid JSON array (no markdown, no preamble) with objects containing these exact keys: clientName, clientEmail, clientPhone, address, preferredDate (YYYY-MM-DD format), serviceLevel ("standard", "deep", or "move"), homeSize, addons (array of strings from: windows, baseboards, blinds, fans, cabinets, pethair, garage, patio, fridge, oven), notes, emailSubject. Map service types: "Initial Deep Cleaning" or "Deep Clean" → "deep", "Standard Recurring" or "Recurring" → "standard", "Move-In" or "Move-Out" or "Move" → "move". Map add-ons: "Cabinet Interiors" → "cabinets", "Extensive Pet Hair" → "pethair", "Garage Basic Clean" → "garage", "Patio / Porch Basic Clean" → "patio", "Inside Refrigerator" → "fridge", "Inside Oven" → "oven", "Interior Windows" → "windows", "Baseboards" → "baseboards", "Blinds" → "blinds", "Ceiling Fans" → "fans". If a field is missing, use an empty string or empty array.`
+          }],
+          mcp_servers:[{
+            type:'url',
+            url:'https://gmailmcp.googleapis.com/mcp/v1',
+            name:'gmail'
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const textContent = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+      let quotes = [];
+      try{
+        const cleaned = textContent.replace(/```json|```/g,'').trim();
+        quotes = JSON.parse(cleaned);
+        if(!Array.isArray(quotes)) quotes = [quotes];
+      }catch(e){ throw new Error('Could not parse quote data from Gmail response'); }
+
+      $('gmailLoading').style.display = 'none';
+      if(quotes.length === 0){
+        $('gmailQuotesList').innerHTML = '<p style="color:var(--slate); font-size:13px; text-align:center; padding:20px 0;">No new quote emails found in the last 30 days.</p>';
+        return;
+      }
+
+      const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+      const addonLabel = {windows:'Interior Windows', baseboards:'Baseboards', blinds:'Blinds', fans:'Ceiling Fans', cabinets:'Cabinet Interiors', pethair:'Pet Hair', garage:'Garage', patio:'Patio/Porch', fridge:'Inside Fridge', oven:'Inside Oven'};
+
+      quotes.forEach((q, idx)=>{
+        const card = document.createElement('div');
+        card.className = 'quote-card';
+        const addonStr = (q.addons||[]).map(a=>addonLabel[a]||a).join(', ') || 'None';
+        card.innerHTML = `
+          <div class="quote-card-head">${escapeHtml(q.clientName||'Unknown client')}</div>
+          <div class="quote-card-meta">
+            📍 ${escapeHtml(q.address||'—')}<br>
+            📅 ${escapeHtml(q.preferredDate||'—')} &nbsp;·&nbsp; 🏠 ${escapeHtml(q.homeSize||'—')}<br>
+            🧹 ${escapeHtml(svcLabel[q.serviceLevel]||q.serviceLevel||'—')}<br>
+            📧 ${escapeHtml(q.clientEmail||'—')} &nbsp;·&nbsp; 📞 ${escapeHtml(q.clientPhone||'—')}
+            ${q.notes ? '<br>💬 ' + escapeHtml(q.notes) : ''}
+          </div>
+          ${addonStr !== 'None' ? `<div class="quote-addons">Add-ons: ${escapeHtml(addonStr)}</div>` : ''}
+          <div class="quote-assign-row">
+            <input type="email" placeholder="Assign to contractor email" data-idx="${idx}">
+            <button data-idx="${idx}">Create Job</button>
+          </div>
+          <div class="quote-created" id="qcreated_${idx}" style="display:none;">✓ Job created and assigned</div>
+        `;
+        card.querySelector('button').onclick = async ()=>{
+          const input = card.querySelector('input');
+          const contractor = input.value.trim();
+          if(!contractor || !contractor.includes('@')){ alert('Enter a valid contractor email'); return; }
+          const btn = card.querySelector('button');
+          btn.disabled = true; btn.textContent = 'Creating…';
+          try{
+            const sections = {};
+            ['arrival','kitchen','bathrooms','bedrooms','living','floors','walkthrough','addons'].forEach(key=>{
+              if(key==='bathrooms'||key==='bedrooms'){
+                sections[key]=[{id:uid(),label:(key==='bathrooms'?'Bathroom':'Bedroom')+' 1',items:{},photos:[],itemPhotos:{},itemNotes:{}}];
+              }else if(key==='addons'){
+                const addonItems={};
+                (q.addons||[]).forEach(a=>{ addonItems[a]=false; });
+                sections[key]={items:addonItems};
+              }else{ sections[key]={items:{},photos:[],itemPhotos:{},itemNotes:{}}; }
+            });
+            const jobId = uid(); const now = Date.now();
+            const jobData = {
+              id:jobId, name:`${q.clientName||'Client'} — ${q.preferredDate||'TBD'}`,
+              client:q.clientName||'', date:q.preferredDate||'', address:q.address||'',
+              photo:null, serviceLevel:q.serviceLevel||'standard',
+              safetyAcknowledged:false, safetyAcknowledgedAt:null,
+              status:'in_progress', submittedAt:null,
+              createdBy:session.email, assignedTo:contractor,
+              clientEmail:q.clientEmail||'', clientPhone:q.clientPhone||'',
+              notes:q.notes||'', editLedger:[], sections, createdAt:now, updatedAt:now
+            };
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs`,{
+              method:'POST',
+              headers:{...authHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
+              body:JSON.stringify({id:jobId,data:jobData,status:'in_progress',created_by:session.email,assigned_to:contractor,updated_at:new Date(now).toISOString()})
+            });
+            if(!res.ok) throw new Error('Create failed: '+res.status);
+            $(`qcreated_${idx}`).style.display='block';
+            card.querySelector('.quote-assign-row').style.opacity='0.4';
+            btn.textContent='Created ✓';
+            await loadAllJobs(); renderList();
+          }catch(e){ btn.disabled=false; btn.textContent='Create Job'; alert('Could not create job: '+e.message); }
+        };
+        $('gmailQuotesList').appendChild(card);
+      });
+
+    }catch(e){
+      $('gmailLoading').style.display='none';
+      $('gmailQuotesList').innerHTML = `<p style="color:var(--red); font-size:13px; padding:10px 0;">Error: ${escapeHtml(e.message)}</p>`;
+    }finally{
+      $('gmailFetchBtn').disabled=false; $('gmailFetchBtn').textContent='Check Gmail for new quotes';
+    }
+  };
+
+  /* ---------------- Create / assign job ---------------- */
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+  $('createJobBtn').onclick = ()=>{
+    $('cjContractor').value=''; $('cjClient').value=''; $('cjAddress').value='';
+    $('cjDate').value=''; $('cjName').value='';
+    $('cjError').classList.remove('show');
+    $('createJobModal').style.display='flex';
+  };
+  $('createJobCloseBtn').onclick = ()=> $('createJobModal').style.display='none';
+  $('createJobModal').addEventListener('click', e=>{ if(e.target.id==='createJobModal') $('createJobModal').style.display='none'; });
+
+  $('cjSaveBtn').onclick = async ()=>{
+    const contractor = $('cjContractor').value.trim();
+    const err = $('cjError');
+    err.classList.remove('show');
+    if(!contractor){ err.textContent='Enter the contractor\'s email'; err.classList.add('show'); return; }
+    if(!contractor.includes('@')){ err.textContent='Enter a valid email address'; err.classList.add('show'); return; }
+
+    $('cjSaveBtn').disabled=true; $('cjSaveBtn').textContent='Creating…';
+
+    const sections = {};
+    const SECT_KEYS = ['arrival','kitchen','bathrooms','bedrooms','living','floors','walkthrough','addons'];
+    SECT_KEYS.forEach(key=>{
+      if(key==='bathrooms'||key==='bedrooms'){
+        sections[key] = [{ id: uid(), label: (key==='bathrooms'?'Bathroom':'Bedroom')+' 1', items:{}, photos:[], itemPhotos:{}, itemNotes:{} }];
+      } else if(key==='addons'){
+        sections[key] = { items:{} };
+      } else {
+        sections[key] = { items:{}, photos:[], itemPhotos:{}, itemNotes:{} };
+      }
+    });
+
+    const jobId = uid();
+    const now = Date.now();
+    const jobData = {
+      id: jobId,
+      name: $('cjName').value.trim() || '',
+      client: $('cjClient').value.trim(),
+      date: $('cjDate').value,
+      address: $('cjAddress').value.trim(),
+      photo: null,
+      serviceLevel: $('cjServiceLevel').value,
+      safetyAcknowledged: false,
+      safetyAcknowledgedAt: null,
+      status: 'in_progress',
+      submittedAt: null,
+      createdBy: session.email,
+      assignedTo: contractor,
+      editLedger: [],
+      sections,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+        method:'POST',
+        headers:{...authHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({
+          id: jobId,
+          data: jobData,
+          status: 'in_progress',
+          created_by: session.email,
+          assigned_to: contractor,
+          updated_at: new Date(now).toISOString()
+        })
+      });
+      if(!res.ok) throw new Error('Could not create job: '+res.status);
+      $('createJobModal').style.display='none';
+      await loadAllJobs();
+      renderList();
+      toast(`Job assigned to ${contractor}`);
+    }catch(e){
+      err.textContent = e.message || 'Could not create job';
+      err.classList.add('show');
+    }finally{
+      $('cjSaveBtn').disabled=false; $('cjSaveBtn').textContent='Create & Assign Job';
+    }
   };
 
   $('saveJobBtn').onclick = async ()=>{
