@@ -1049,11 +1049,10 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveCurrent, 350);
   }
-  async function saveCurrent(){
+  async function saveCurrent(isRetry = false){
     if(!current) return;
     current.updatedAt = Date.now();
     if(!current.createdBy && session) current.createdBy = session.email;
-    // Track if a previously-submitted job was edited after submission
     if(current.submittedAt && current.status === 'in_progress'){
       current.modifiedAfterSubmitAt = Date.now();
     }
@@ -1070,17 +1069,27 @@
           updated_at: new Date(current.updatedAt).toISOString()
         })
       });
+
+      // 401 = token expired — refresh and retry once automatically
+      if(res.status === 401 && !isRetry){
+        console.log('Session expired during save — refreshing token...');
+        const ns = await refreshSession(session);
+        if(ns){ session = ns; saveSession(ns); return saveCurrent(true); }
+        else { toast('Session expired — please log out and back in'); return; }
+      }
+
       if(!res.ok) throw new Error(`Save failed: ${res.status}`);
 
       // Check if admin has archived/removed this job
-      const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(current.id)}&select=status,data->>removedByAdmin`, { headers: authHeaders() });
-      if(checkRes.ok){
-        const rows = await checkRes.json();
-        if(rows.length && (rows[0].status === 'archived' || rows[0].removedByAdmin === 'true')){
-          showJobRemovedNotice();
-          return;
+      try{
+        const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(current.id)}&select=status,data`, { headers: authHeaders() });
+        if(checkRes.ok){
+          const rows = await checkRes.json();
+          if(rows.length && (rows[0].status === 'archived' || (rows[0].data && rows[0].data.removedByAdmin))){
+            showJobRemovedNotice(); return;
+          }
         }
-      }
+      }catch(e){ /* non-critical check — ignore */ }
 
       const idx = jobsIndex.find(j=>j.id===current.id);
       if(idx){
@@ -1089,8 +1098,24 @@
         idx.pct = computeOverallPct().pct;
         idx.status = current.status || 'in_progress';
       }
-    }catch(e){ console.error('Save failed', e); toast('Could not save — check your connection'); }
+    }catch(e){
+      if(!isRetry){
+        // Silent retry after 3 seconds for transient network errors
+        await new Promise(r=>setTimeout(r,3000));
+        return saveCurrent(true);
+      }
+      console.error('Save failed', e);
+      toast('Could not save — check your connection');
+    }
   }
+
+  // Keep session alive — refresh token every 45 minutes while app is open
+  setInterval(async ()=>{
+    if(session && session.refresh_token){
+      const ns = await refreshSession(session);
+      if(ns){ session = ns; saveSession(ns); }
+    }
+  }, 45 * 60 * 1000);
 
   function showJobRemovedNotice(){
     current = null;
