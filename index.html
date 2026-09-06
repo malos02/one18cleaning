@@ -994,6 +994,7 @@
   let jobsIndex = [];
   let current = null; // full job object in memory
   let detailsOpen = false;
+  let _renderScrollY = null;
 
   const $ = id => document.getElementById(id);
   const toastEl = $('toast');
@@ -1153,9 +1154,14 @@
     screen.id = 'acceptScreen';
     screen.innerHTML = `
       <div class="accept-header">
-        <div class="seal">✦</div>
-        <h1>New Job Assigned</h1>
-        <p>One:18 Cleaning · Cleaning With Purpose</p>
+        <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:16px;">
+          <div class="seal" style="width:44px; height:44px; border-width:2px;"></div>
+          <div style="text-align:left;">
+            <div style="font-family:'Fraunces',serif; color:#fff; font-size:19px; font-weight:700; line-height:1.1;">One:18 Cleaning</div>
+            <div style="color:var(--gold); font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">Cleaning With Purpose</div>
+          </div>
+        </div>
+        <h1 style="font-family:'Fraunces',serif; color:#fff; font-size:17px; margin:0 0 2px; font-weight:600; opacity:0.9;">New Job Assigned</h1>
       </div>
       <div class="accept-body">
         <div class="accept-label">Review your job details</div>
@@ -1444,6 +1450,7 @@
 
   function render(){
     if(!current) return;
+    if(_renderScrollY === null) _renderScrollY = window.scrollY; // capture before DOM rebuild
 
     // Show acceptance screen for newly assigned jobs not yet accepted
     if(!current.accepted && !viewingHistoryJob){
@@ -1468,7 +1475,8 @@
 
     // Auto-open job details panel when job has assigned data
     const hasDetails = current.client || current.address || current.date;
-    if(hasDetails && !detailsOpen){
+    if(hasDetails && !detailsOpen && !current._detailsWasShown){
+      current._detailsWasShown = true;
       detailsOpen = true;
       $('detailsPanel').classList.add('open');
       $('toggleDetailsBtn').textContent = 'Job details ▴';
@@ -1508,11 +1516,11 @@
     }
     renderSubmitArea();
 
-    // Restore scroll position for this job (saved locally per device)
-    if(current.id){
-      const savedY = localStorage.getItem('scroll_' + current.id);
-      if(savedY) requestAnimationFrame(()=> window.scrollTo(0, parseInt(savedY, 10)));
-    }
+    // Restore scroll — use current position for live edits, localStorage for page reload
+    const lsScrollY = current.id ? localStorage.getItem('scroll_' + current.id) : null;
+    const targetY = _renderScrollY !== null ? _renderScrollY : (lsScrollY ? parseInt(lsScrollY, 10) : null);
+    if(targetY !== null) requestAnimationFrame(()=> window.scrollTo(0, targetY));
+    _renderScrollY = null;
   }
 
   function renderSubmitArea(){
@@ -1563,10 +1571,11 @@
         if(current.submittedSnapshot && current.modifiedAfterSubmitAt){
           // Compute what changed and add a ledger entry
           const changes = generateLedgerEntry(current.submittedSnapshot, current);
+          const changeList = changes.length ? changes : ['Job reopened and resubmitted — no specific checklist changes detected'];
           current.editLedger.unshift({
             timestamp: Date.now(),
             email: session.email,
-            changes: changes.length ? changes : ['Job reopened and resubmitted — no specific checklist changes detected'],
+            changes: changeList,
             reviewed: false
           });
           // Update snapshot so next edit cycle diffs from here
@@ -1574,7 +1583,39 @@
             details: { name: current.name, client: current.client, date: current.date, address: current.address, serviceLevel: current.serviceLevel },
             sections: JSON.parse(JSON.stringify(current.sections))
           };
-          // Keep modifiedAfterSubmitAt set — admin clears it by reviewing
+          // Notify admin of the changes
+          const svcLabelMap = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+          fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              secret: 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg',
+              to: 'one18cleaning@gmail.com',
+              subject: `⚠️ Job Updated — ${current.client || current.name || 'Job'} (Resubmitted)`,
+              html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <div style="background:#16283F;padding:24px;text-align:center;">
+                  <div style="color:#C79A5D;font-size:20px;font-weight:700;">ONE:18 CLEANING</div>
+                  <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;">JOB UPDATED</div>
+                </div>
+                <div style="padding:28px 24px;background:#FAF6EE;">
+                  <h2 style="margin:0 0 8px;color:#20303F;font-size:18px;">A submitted job was edited and resubmitted</h2>
+                  <p style="color:#6B7A8C;font-size:13px;margin:0 0 16px;">Contractor: <strong>${session.email}</strong></p>
+                  <div style="background:#fff;border:1.5px solid #E4DCCB;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+                    ${current.client?`<div style="margin-bottom:6px;"><span style="color:#6B7A8C;">Client: </span><strong>${current.client}</strong></div>`:''}
+                    ${current.address?`<div style="margin-bottom:6px;"><span style="color:#6B7A8C;">Address: </span><strong>${current.address}</strong></div>`:''}
+                    <div style="margin-bottom:6px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabelMap[current.serviceLevel]||'Standard'}</strong></div>
+                  </div>
+                  <div style="background:#FFF8EE;border:1px solid #E8D9B5;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+                    <div style="font-size:11px;font-weight:700;color:#9A7040;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Changes made</div>
+                    ${changeList.map(c=>`<div style="font-size:13px;color:#20303F;padding:4px 0;border-bottom:1px solid #F0E4CC;">• ${c}</div>`).join('')}
+                  </div>
+                  <a href="https://malos02.github.io/one18cleaning/admin.html" style="display:block;background:#16283F;color:#fff;text-align:center;padding:11px;border-radius:9px;text-decoration:none;font-weight:700;font-size:14px;">Review in Admin Dashboard →</a>
+                </div>
+                <div style="background:#16283F;padding:12px 24px;text-align:center;">
+                  <div style="color:rgba(255,255,255,0.5);font-size:11px;">One:18 Cleaning • Cleaning With Purpose</div>
+                </div>
+              </div>`
+            })
+          }).catch(e=>console.error('Change notify email failed:',e));
         } else if(!current.submittedSnapshot){
           // First ever submission — just save the baseline snapshot
           current.submittedSnapshot = {
@@ -2097,8 +2138,21 @@
   /* ---------------- Top-level controls ---------------- */
   // Save scroll position locally so contractor resumes where they left off
   let scrollSaveTimer;
+  let lastScrollY = 0;
   window.addEventListener('scroll', ()=>{
     if(!current || !current.id) return;
+    const y = window.scrollY;
+
+    // Auto-collapse job details when scrolling down past 60px
+    if(y > 60 && y > lastScrollY && detailsOpen){
+      detailsOpen = false;
+      const panel = $('detailsPanel');
+      const btn = $('toggleDetailsBtn');
+      if(panel) panel.classList.remove('open');
+      if(btn) btn.textContent = 'Job details ▾';
+    }
+    lastScrollY = y;
+
     clearTimeout(scrollSaveTimer);
     scrollSaveTimer = setTimeout(()=>{
       try{ localStorage.setItem('scroll_' + current.id, window.scrollY); }catch(e){}
