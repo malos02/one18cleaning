@@ -977,7 +977,7 @@
   async function loadJobsIndex(retrying = false){
     try{
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at,status&order=updated_at.desc`,
+        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,updated_at,status,assigned_to&order=updated_at.desc`,
         { headers: authHeaders() }
       );
       if(!res.ok) throw new Error(`List failed: ${res.status}`);
@@ -987,11 +987,11 @@
         name: (r.data && r.data.name) || '',
         updatedAt: new Date(r.updated_at).getTime(),
         pct: r.data ? computePctForJob(r.data).pct : 0,
-        status: r.status
+        status: r.status,
+        assignedTo: r.assigned_to || (r.data && r.data.assignedTo) || null
       }));
     }catch(e){
       if(!retrying){
-        // Silent retry after 2 seconds — session may not be ready yet on first load
         await new Promise(r=>setTimeout(r,2000));
         return loadJobsIndex(true);
       }
@@ -1086,12 +1086,17 @@
       const el = document.getElementById('waitingStatus');
       if(el) el.textContent = 'Checking for assigned jobs…';
       await loadJobsIndex();
-      const activeJobs = jobsIndex.filter(j=>j.status !== 'archived');
-      if(activeJobs.length){
-        // Found an assigned job — load it
+      const contractorEmail = session && session.email;
+      const assignedJobs = jobsIndex.filter(j =>
+        j.status !== 'archived' && j.status !== 'approved' &&
+        j.assignedTo && j.assignedTo.toLowerCase() === (contractorEmail || '').toLowerCase()
+      );
+      if(assignedJobs.length){
         overlay.remove();
-        const mostRecent = activeJobs.sort((a,b)=>b.updatedAt-a.updatedAt)[0];
-        const job = await loadJob(mostRecent.id);
+        const inProgress = assignedJobs.filter(j => j.status === 'in_progress');
+        const pick = (inProgress.length ? inProgress : assignedJobs)
+          .sort((a,b) => b.updatedAt - a.updatedAt)[0];
+        const job = await loadJob(pick.id);
         if(job && !job.removedByAdmin){
           current = job;
           render();
@@ -1107,11 +1112,18 @@
 
   async function boot(){
     await loadJobsIndex();
-    const activeJobs = jobsIndex.filter(j=>j.status !== 'archived');
+    const contractorEmail = session && session.email;
 
-    if(activeJobs.length){
-      const mostRecent = activeJobs.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
-      const job = await loadJob(mostRecent.id);
+    // Only show active (in_progress) jobs explicitly assigned to this contractor
+    // Submitted/approved jobs are read-only and visible via History only
+    const assignedJobs = jobsIndex.filter(j =>
+      j.status === 'in_progress' &&
+      j.assignedTo && j.assignedTo.toLowerCase() === (contractorEmail || '').toLowerCase()
+    );
+
+    if(assignedJobs.length){
+      const pick = assignedJobs.slice().sort((a,b) => b.updatedAt - a.updatedAt)[0];
+      const job = await loadJob(pick.id);
       if(job && job.removedByAdmin){
         showJobRemovedNotice();
         return;
@@ -1975,43 +1987,56 @@
 
   $('historyBtn').onclick = async ()=>{
     const list = $('historyList');
-    list.innerHTML = '';
-    // Load all jobs and filter to submitted
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,updated_at&order=updated_at.desc`, { headers: authHeaders() });
-    if(!res.ok){ toast('Could not load history'); return; }
-    const rows = await res.json();
-    const submitted = rows.filter(r => r.status === 'submitted');
-    if(!submitted.length){
-      list.innerHTML = '<p style="color:var(--slate); font-size:13px; text-align:center; padding:20px 0;">No submitted jobs yet.</p>';
-    } else {
-      submitted.forEach(r=>{
-        const d = r.data || {};
-        const card = document.createElement('div');
-        card.className = 'history-job-card';
-        const thumb = d.photo
-          ? `<img class="history-job-thumb" src="${d.photo}" alt="">`
-          : `<div class="history-job-thumb-placeholder">🏠</div>`;
-        card.innerHTML = `
-          ${thumb}
-          <div class="history-job-info">
-            <div class="hjn">${escapeHtml(d.name || d.client || 'Untitled job')}</div>
-            <div class="hjm">${escapeHtml(d.client || '')}${d.address ? ' · '+escapeHtml(d.address) : ''}${d.date ? ' · '+escapeHtml(d.date) : ''}</div>
-          </div>
-          <div style="font-size:11px; font-weight:700; color:var(--green); flex:none;">✓ Done</div>
-        `;
-        card.onclick = ()=>{
-          $('historySheet').classList.remove('open');
-          // Load this job as read-only view
-          const savedCurrent = current;
-          current = d;
-          viewingHistoryJob = true;
-          $('backToCurrentBtn').classList.add('visible');
-          render();
-        };
-        list.appendChild(card);
-      });
-    }
+    list.innerHTML = '<p style="color:var(--slate);font-size:13px;text-align:center;padding:16px 0;">Loading…</p>';
     $('historySheet').classList.add('open');
+    try{
+      // Only fetch completed jobs assigned to this contractor
+      const contractorEmail = session && session.email;
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,assigned_to,updated_at&order=updated_at.desc`,
+        { headers: authHeaders() }
+      );
+      if(!res.ok) throw new Error('fetch failed');
+      const rows = await res.json();
+      // Filter to only this contractor's completed (submitted or approved) jobs
+      const completed = rows.filter(r =>
+        (r.status === 'submitted' || r.status === 'approved') &&
+        r.assigned_to && r.assigned_to.toLowerCase() === (contractorEmail || '').toLowerCase()
+      );
+      list.innerHTML = '';
+      if(!completed.length){
+        list.innerHTML = '<p style="color:var(--slate);font-size:13px;text-align:center;padding:20px 0;">No completed jobs yet.</p>';
+      } else {
+        completed.forEach(r=>{
+          const d = r.data || {};
+          const isApproved = r.status === 'approved';
+          const card = document.createElement('div');
+          card.className = 'history-job-card';
+          const thumb = d.photo
+            ? `<img class="history-job-thumb" src="${escapeHtml(d.photo)}" alt="">`
+            : `<div class="history-job-thumb-placeholder">🏠</div>`;
+          const statusBadge = isApproved
+            ? `<div style="font-size:11px;font-weight:700;color:#1A6B9A;flex:none;">✓ Approved</div>`
+            : `<div style="font-size:11px;font-weight:700;color:var(--green);flex:none;">Submitted</div>`;
+          card.innerHTML = `
+            ${thumb}
+            <div class="history-job-info">
+              <div class="hjn">${escapeHtml(d.name || d.client || 'Untitled job')}</div>
+              <div class="hjm">${escapeHtml(d.client || '')}${d.address ? ' · '+escapeHtml(d.address) : ''}${d.date ? ' · '+escapeHtml(d.date) : ''}</div>
+            </div>
+            ${statusBadge}
+          `;
+          card.onclick = ()=>{
+            $('historySheet').classList.remove('open');
+            current = d;
+            viewingHistoryJob = true;
+            $('backToCurrentBtn').classList.add('visible');
+            render();
+          };
+          list.appendChild(card);
+        });
+      }
+    }catch(e){ list.innerHTML = '<p style="color:var(--slate);font-size:13px;text-align:center;padding:16px 0;">Could not load history.</p>'; }
   };
 
   $('closeHistoryBtn').onclick = ()=> $('historySheet').classList.remove('open');
