@@ -519,6 +519,14 @@
     }catch(e){ console.error(e); allJobs = []; }
   }
 
+  // Auto-refresh every 60s so new submissions appear without manual reload
+  setInterval(async ()=>{
+    if(document.visibilityState === 'visible' && authHeaders().Authorization !== `Bearer ${SUPABASE_KEY}`){
+      await loadAllJobs();
+      renderList();
+    }
+  }, 60000);
+
   /* ---------------- List rendering ---------------- */
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -550,20 +558,23 @@
       return;
     }
 
-    // Sort: changed (unreviewed edits) first → submitted → in_progress → approved → archived
-    // Within each group, most recently updated first
-    const statusPriority = j => {
-      const hasUnreviewed = j.data && j.data.editLedger && j.data.editLedger.some(e=>!e.reviewed);
-      if(hasUnreviewed && j.status === 'submitted') return 0; // changed + submitted
-      if(j.status === 'submitted') return 1;
-      if(j.status === 'in_progress') return 2;
-      if(j.status === 'approved') return 3;
-      return 4; // archived
-    };
+    // Sort priority: unreviewed changes → submitted → in_progress → approved → archived
+    // Within each group: most recently submitted/updated first
     filtered.sort((a,b)=>{
-      const pd = statusPriority(a) - statusPriority(b);
-      if(pd !== 0) return pd;
-      return new Date(b.updated_at||0) - new Date(a.updated_at||0);
+      const getPriority = j => {
+        const hasUnreviewed = j.data && j.data.editLedger && j.data.editLedger.some(e=>!e.reviewed);
+        if(j.status === 'submitted' && hasUnreviewed) return 0;
+        if(j.status === 'submitted') return 1;
+        if(j.status === 'in_progress') return 2;
+        if(j.status === 'approved') return 3;
+        return 4;
+      };
+      const pa = getPriority(a), pb = getPriority(b);
+      if(pa !== pb) return pa - pb;
+      // Within same priority: most recent submission first, then most recent update
+      const aTime = a.submitted_at || a.updated_at || 0;
+      const bTime = b.submitted_at || b.updated_at || 0;
+      return new Date(bTime) - new Date(aTime);
     });
 
     filtered.forEach(j=>{
@@ -601,7 +612,11 @@
           </div>
         </div>
         <div class="card-actions">
-          ${j.status === 'in_progress' ? '<button class="card-btn assign">Assign</button>' : ''}
+          ${j.status === 'in_progress'
+            ? j.assigned_to
+              ? '<button class="card-btn assign" style="color:var(--slate);">Reassign</button>'
+              : '<button class="card-btn assign">Assign</button>'
+            : ''}
           ${j.status === 'submitted' ? '<button class="card-btn review-btn" style="flex:2; background:#EEF2F9; color:var(--navy); border-color:var(--navy); font-weight:700;">👁 Review</button>' : ''}
           <button class="card-btn ${isArchived?'unarchive':'archive'}">${isArchived?'Unarchive':'Archive'}</button>
           <button class="card-btn delete">Delete</button>
