@@ -550,6 +550,22 @@
       return;
     }
 
+    // Sort: changed (unreviewed edits) first → submitted → in_progress → approved → archived
+    // Within each group, most recently updated first
+    const statusPriority = j => {
+      const hasUnreviewed = j.data && j.data.editLedger && j.data.editLedger.some(e=>!e.reviewed);
+      if(hasUnreviewed && j.status === 'submitted') return 0; // changed + submitted
+      if(j.status === 'submitted') return 1;
+      if(j.status === 'in_progress') return 2;
+      if(j.status === 'approved') return 3;
+      return 4; // archived
+    };
+    filtered.sort((a,b)=>{
+      const pd = statusPriority(a) - statusPriority(b);
+      if(pd !== 0) return pd;
+      return new Date(b.updated_at||0) - new Date(a.updated_at||0);
+    });
+
     filtered.forEach(j=>{
       const d = j.data || {};
       const pct = computePctForJob(d);
