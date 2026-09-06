@@ -1066,6 +1066,7 @@
           status: current.status || 'in_progress',
           submitted_at: current.submittedAt ? new Date(current.submittedAt).toISOString() : null,
           created_by: current.createdBy || null,
+          assigned_to: current.assignedTo || null,
           updated_at: new Date(current.updatedAt).toISOString()
         })
       });
@@ -1155,6 +1156,8 @@
           if(assigned.length){
             overlay.remove();
             current = assigned[0].data;
+            // Persist the DB-level assigned_to into current so saves include it
+            if(!current.assignedTo && assigned[0].assigned_to) current.assignedTo = assigned[0].assigned_to;
             await loadJobsIndex();
             render();
             toast('New job assigned — ready to start');
@@ -1285,6 +1288,8 @@
 
       if(assigned.length){
         const job = assigned[0].data;
+        // Persist DB-level assigned_to into job data so saves include it
+        if(!job.assignedTo && assigned[0].assigned_to) job.assignedTo = assigned[0].assigned_to;
         current = job;
         // Also rebuild jobsIndex for history/other uses
         await loadJobsIndex();
