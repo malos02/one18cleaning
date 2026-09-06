@@ -140,6 +140,11 @@
   .details-panel.open{display:block;}
   .field-row{display:flex; gap:8px; margin-bottom:8px;}
   .field-row:last-child{margin-bottom:0;}
+  .field-value{
+    font-size:13.5px; font-weight:600; color:var(--navy);
+    padding:7px 10px; background:var(--paper); border:1px solid var(--line);
+    border-radius:8px; min-height:34px; line-height:1.4;
+  }
   .field{flex:1; min-width:0;}
   .field label{display:block; font-size:10px; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;}
   .field input, .field select{
@@ -598,18 +603,24 @@
   <div class="details-panel" id="detailsPanel">
     <div class="field-row">
       <div class="field">
-        <label>Client name</label>
-        <input id="clientInput" placeholder="e.g. Priya Nair" />
+        <label>Client</label>
+        <div class="field-value" id="clientDisplay">—</div>
       </div>
       <div class="field">
-        <label>Service date</label>
-        <input id="dateInput" type="date" />
+        <label>Date</label>
+        <div class="field-value" id="dateDisplay">—</div>
       </div>
     </div>
     <div class="field-row">
       <div class="field">
-        <label>Property address</label>
-        <input id="addressInput" placeholder="Street, city" />
+        <label>Address</label>
+        <div class="field-value" id="addressDisplay">—</div>
+      </div>
+    </div>
+    <div class="field-row" id="notesRow" style="display:none;">
+      <div class="field">
+        <label>Notes from office</label>
+        <div class="field-value" id="notesDisplay" style="font-style:italic; color:var(--slate);"></div>
       </div>
     </div>
   </div>
@@ -1318,9 +1329,25 @@
   function render(){
     if(!current) return;
     $('jobNameInput').value = current.name || '';
-    $('clientInput').value = current.client || '';
-    $('dateInput').value = current.date || '';
-    $('addressInput').value = current.address || '';
+
+    // Populate read-only job detail fields
+    $('clientDisplay').textContent = current.client || '—';
+    $('dateDisplay').textContent = current.date ? new Date(current.date + 'T00:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'}) : '—';
+    $('addressDisplay').textContent = current.address || '—';
+    if(current.notes){
+      $('notesDisplay').textContent = current.notes;
+      $('notesRow').style.display = '';
+    } else {
+      $('notesRow').style.display = 'none';
+    }
+
+    // Auto-open job details panel when job has assigned data
+    const hasDetails = current.client || current.address || current.date;
+    if(hasDetails && !detailsOpen){
+      detailsOpen = true;
+      $('detailsPanel').classList.add('open');
+      $('toggleDetailsBtn').textContent = 'Job details ▴';
+    }
     $('jobMetaLine').textContent = current.client
       ? `${current.client}${current.address ? ' · '+current.address : ''}`
       : 'No client details yet — check with the office';
@@ -1334,11 +1361,9 @@
       b.style.opacity = isLocked() ? '0.5' : '';
     });
 
-    // Lock/unlock job detail fields
-    ['jobNameInput','clientInput','dateInput','addressInput'].forEach(id=>{
-      const el = $(id);
-      if(el) el.disabled = isLocked();
-    });
+    // Lock job name input when submitted
+    const jobNameEl = $('jobNameInput');
+    if(jobNameEl) jobNameEl.disabled = isLocked();
 
     const overall = computeOverallPct();
     $('progressPct').textContent = overall.pct + '% complete';
@@ -1932,9 +1957,8 @@
 
   /* ---------------- Top-level controls ---------------- */
   $('jobNameInput').addEventListener('input', e=>{ current.name = e.target.value; scheduleSave(); });
-  $('clientInput').addEventListener('input', e=>{ current.client = e.target.value; scheduleSave(); render(); });
-  $('dateInput').addEventListener('input', e=>{ current.date = e.target.value; scheduleSave(); });
-  $('addressInput').addEventListener('input', e=>{ current.address = e.target.value; scheduleSave(); render(); });
+
+  // Job details are read-only — set by admin on assignment
 
   $('toggleDetailsBtn').onclick = ()=>{
     detailsOpen = !detailsOpen;
