@@ -2089,26 +2089,6 @@
   }
 
   /* ---------------- Boot ---------------- */
-  async function boot(){
-    await loadJobsIndex();
-    // Filter out removed/archived jobs from the index
-    const activeJobs = jobsIndex.filter(j => j.status !== 'archived');
-    if(activeJobs.length){
-      const mostRecent = activeJobs.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
-      const job = await loadJob(mostRecent.id);
-      if(job && job.removedByAdmin){
-        showJobRemovedNotice();
-        return;
-      }
-      current = job || newJob('');
-    } else {
-      current = newJob('');
-      await saveCurrent();
-      jobsIndex.push({ id: current.id, name:'', updatedAt: current.updatedAt, pct: 0 });
-    }
-    render();
-  }
-
   function showLoginError(msg){
     const el = $('loginError');
     el.textContent = msg;
