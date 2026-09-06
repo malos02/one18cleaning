@@ -1096,25 +1096,24 @@
       pollCount++;
       const el = document.getElementById('waitingStatus');
       if(el) el.textContent = 'Checking for assigned jobs…';
-      await loadJobsIndex();
-      const contractorEmail = session && session.email;
-      const assignedJobs = jobsIndex.filter(j =>
-        j.status !== 'archived' && j.status !== 'approved' &&
-        j.assignedTo && j.assignedTo.toLowerCase() === (contractorEmail || '').toLowerCase()
-      );
-      if(assignedJobs.length){
-        overlay.remove();
-        const inProgress = assignedJobs.filter(j => j.status === 'in_progress');
-        const pick = (inProgress.length ? inProgress : assignedJobs)
-          .sort((a,b) => b.updatedAt - a.updatedAt)[0];
-        const job = await loadJob(pick.id);
-        if(job && !job.removedByAdmin){
-          current = job;
-          render();
-          toast('New job assigned — ready to start');
-          return;
+      try{
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at&order=updated_at.desc`,
+          { headers: authHeaders() }
+        );
+        if(res.ok){
+          const rows = await res.json();
+          const assigned = rows.filter(r => r.data && !r.data.removedByAdmin);
+          if(assigned.length){
+            overlay.remove();
+            current = assigned[0].data;
+            await loadJobsIndex();
+            render();
+            toast('New job assigned — ready to start');
+            return;
+          }
         }
-      }
+      }catch(e){ console.error('poll error', e); }
       if(el) el.textContent = `No jobs assigned yet · checking again in 30s`;
       setTimeout(poll, 30000);
     };
@@ -1122,33 +1121,33 @@
   }
 
   async function boot(){
+    // Directly query Supabase for this contractor's current in_progress job
+    // PostgREST + RLS handle all permission filtering — no client-side email matching needed
+    try{
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at&order=updated_at.desc`,
+        { headers: authHeaders() }
+      );
+      if(!res.ok) throw new Error('fetch failed');
+      const rows = await res.json();
+
+      // RLS already restricts to this contractor's accessible jobs
+      // Pick most recent in_progress assigned job (assigned_to not null)
+      const assigned = rows.filter(r => r.data && !r.data.removedByAdmin);
+
+      if(assigned.length){
+        const job = assigned[0].data;
+        current = job;
+        // Also rebuild jobsIndex for history/other uses
+        await loadJobsIndex();
+        render();
+        return;
+      }
+    }catch(e){ console.error('boot fetch error', e); }
+
+    // No assigned in_progress job found — show waiting screen
     await loadJobsIndex();
-    const contractorEmail = session && session.email;
-
-    // Only show active (in_progress) jobs explicitly assigned to this contractor
-    // Submitted/approved jobs are read-only and visible via History only
-    const assignedJobs = jobsIndex.filter(j =>
-      j.status === 'in_progress' &&
-      j.assignedTo && j.assignedTo.toLowerCase() === (contractorEmail || '').toLowerCase()
-    );
-
-    if(assignedJobs.length){
-      const pick = assignedJobs.slice().sort((a,b) => b.updatedAt - a.updatedAt)[0];
-      const job = await loadJob(pick.id);
-      if(job && job.removedByAdmin){
-        showJobRemovedNotice();
-        return;
-      }
-      current = job || null;
-      if(!current){
-        showWaitingScreen('No Jobs Assigned', 'The office will assign you a job. This page checks automatically every 30 seconds.');
-        return;
-      }
-    } else {
-      showWaitingScreen('No Jobs Assigned', 'The office will assign you a job. This page checks automatically every 30 seconds.');
-      return;
-    }
-    render();
+    showWaitingScreen('No Jobs Assigned', 'The office will assign you a job. This page checks automatically every 30 seconds.');
   }
   async function deleteJobRemote(id){
     try{
