@@ -988,7 +988,7 @@
         updatedAt: new Date(r.updated_at).getTime(),
         pct: r.data ? computePctForJob(r.data).pct : 0,
         status: r.status,
-        assignedTo: r.assigned_to || (r.data && r.data.assignedTo) || null
+        assignedTo: r.assigned_to || null
       }));
     }catch(e){
       if(!retrying){
