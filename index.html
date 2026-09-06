@@ -401,6 +401,31 @@
   .status-pill.in_progress{background:var(--cream); color:var(--slate); border:1px solid var(--line);}
 
   /* ---------- Safety gate & DO NOT list modal ---------- */
+  /* ---- Job Acceptance Screen ---- */
+  .accept-screen{
+    position:fixed; inset:0; background:var(--cream); z-index:55;
+    display:flex; flex-direction:column; overflow-y:auto;
+  }
+  .accept-header{
+    background:var(--navy); padding:28px 20px 24px; text-align:center;
+  }
+  .accept-header .seal{font-size:32px; margin-bottom:6px;}
+  .accept-header h1{font-family:'Fraunces',serif; color:#fff; font-size:20px; margin:0 0 2px; font-weight:700;}
+  .accept-header p{color:var(--gold); font-size:11px; letter-spacing:0.1em; margin:0; text-transform:uppercase;}
+  .accept-body{ padding:24px 16px 40px; flex:1; }
+  .accept-label{ font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--slate); text-transform:uppercase; margin-bottom:16px; }
+  .accept-card{ background:#fff; border:1.5px solid var(--line); border-radius:16px; padding:20px; margin-bottom:20px; }
+  .accept-row{ display:flex; gap:12px; margin-bottom:14px; }
+  .accept-row:last-child{ margin-bottom:0; }
+  .accept-field{ flex:1; min-width:0; }
+  .accept-field .af-label{ font-size:10.5px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:3px; }
+  .accept-field .af-val{ font-size:14px; font-weight:700; color:var(--navy); line-height:1.3; }
+  .service-badge{ display:inline-block; background:var(--navy); color:var(--gold); font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; letter-spacing:0.04em; }
+  .accept-notes{ background:#FFF8EE; border:1px solid #E8D9B5; border-radius:10px; padding:12px 14px; font-size:13px; color:var(--navy); line-height:1.5; margin-bottom:20px; font-style:italic; }
+  .accept-btn{ width:100%; background:var(--green); color:#fff; border:none; border-radius:14px; padding:16px; font-size:16px; font-weight:800; cursor:pointer; letter-spacing:0.02em; margin-bottom:12px; }
+  .accept-btn:active{ opacity:0.85; }
+  .accept-footer{ text-align:center; font-size:12px; color:var(--slate); padding:0 16px 20px; }
+
   .history-sheet{
     position:fixed; inset:0; background:rgba(20,30,45,0.6); z-index:60;
     display:none; align-items:flex-end;
@@ -629,11 +654,7 @@
 <main>
   <div id="safetyGateArea"></div>
 
-  <div class="service-toggle" id="serviceToggle">
-    <button data-level="standard" class="active">Standard</button>
-    <button data-level="deep">Deep Clean</button>
-    <button data-level="move">Move In/Out</button>
-  </div>
+  <div id="serviceBadgeWrap" style="margin-bottom:4px;"></div>
 
   <div id="sectionsRoot"></div>
 
@@ -787,6 +808,7 @@
   /* ---------------- Section schema (from the One:18 SOP) ---------------- */
   const SCHEMA = [
     { key:'arrival', num:1, title:'Arrival & Property Entry', sub:'Access, walkthrough, pre-existing conditions',
+      required: true,
       items:[
         'Parked legally, not blocking access',
         'Used approved entry method only',
@@ -1120,6 +1142,101 @@
     setTimeout(poll, 3000); // First check after 3s
   }
 
+  function showAcceptanceScreen(){
+    const d = current;
+    const svcLabels = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+    const svcLabel = svcLabels[d.serviceLevel] || 'Standard Clean';
+    const dateStr = d.date ? new Date(d.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '—';
+
+    const screen = document.createElement('div');
+    screen.className = 'accept-screen';
+    screen.id = 'acceptScreen';
+    screen.innerHTML = `
+      <div class="accept-header">
+        <div class="seal">✦</div>
+        <h1>New Job Assigned</h1>
+        <p>One:18 Cleaning · Cleaning With Purpose</p>
+      </div>
+      <div class="accept-body">
+        <div class="accept-label">Review your job details</div>
+        <div class="accept-card">
+          <div class="accept-row">
+            <div class="accept-field">
+              <div class="af-label">Client</div>
+              <div class="af-val">${escapeHtml(d.client || '—')}</div>
+            </div>
+            <div class="accept-field">
+              <div class="af-label">Date</div>
+              <div class="af-val">${escapeHtml(dateStr)}</div>
+            </div>
+          </div>
+          <div class="accept-row">
+            <div class="accept-field">
+              <div class="af-label">Address</div>
+              <div class="af-val">${escapeHtml(d.address || '—')}</div>
+            </div>
+          </div>
+          ${d.homeSize ? `<div class="accept-row"><div class="accept-field"><div class="af-label">Home Size</div><div class="af-val">${escapeHtml(d.homeSize)}</div></div></div>` : ''}
+          <div class="accept-row">
+            <div class="accept-field">
+              <div class="af-label">Service Type</div>
+              <div class="af-val"><span class="service-badge">${svcLabel}</span></div>
+            </div>
+          </div>
+        </div>
+        ${d.notes ? `<div class="accept-notes">📝 <strong>Note from office:</strong> ${escapeHtml(d.notes)}</div>` : ''}
+        <button class="accept-btn" id="acceptJobBtn">✓ Accept Job</button>
+        <div class="accept-footer">By accepting, you confirm you've reviewed the job details and are ready to complete this service.</div>
+      </div>
+    `;
+
+    document.body.appendChild(screen);
+
+    document.getElementById('acceptJobBtn').onclick = async ()=>{
+      const btn = document.getElementById('acceptJobBtn');
+      btn.disabled = true; btn.textContent = 'Accepting…';
+
+      current.accepted = true;
+      current.acceptedAt = Date.now();
+      await saveCurrent();
+
+      // Email admin that job was accepted
+      const contractorEmail = session && session.email;
+      fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          secret: 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg',
+          to: 'one18cleaning@gmail.com',
+          subject: `✅ Job Accepted — ${d.client || d.name || 'New Job'}`,
+          html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;">
+            <div style="background:#16283F;padding:24px;text-align:center;">
+              <div style="color:#C79A5D;font-size:20px;font-weight:700;">ONE:18 CLEANING</div>
+              <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;">JOB ACCEPTED</div>
+            </div>
+            <div style="padding:28px 24px;background:#FAF6EE;">
+              <h2 style="margin:0 0 8px;color:#20303F;font-size:19px;">Job Accepted by Contractor</h2>
+              <p style="color:#6B7A8C;font-size:14px;margin:0 0 20px;">${contractorEmail} has accepted the job and is ready to begin.</p>
+              <div style="background:#fff;border:1.5px solid #E4DCCB;border-radius:12px;padding:16px 20px;">
+                ${d.client?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Client: </span><strong>${d.client}</strong></div>`:''}
+                ${d.address?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Address: </span><strong>${d.address}</strong></div>`:''}
+                ${d.date?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Date: </span><strong>${d.date}</strong></div>`:''}
+                <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabel}</strong></div>
+                <div style="margin-top:12px;background:#EAF2ED;border-radius:8px;padding:10px 14px;color:#4B7A5E;font-weight:700;">Accepted at ${new Date().toLocaleTimeString()} on ${new Date().toLocaleDateString()}</div>
+              </div>
+            </div>
+            <div style="background:#16283F;padding:12px 24px;text-align:center;">
+              <div style="color:rgba(255,255,255,0.5);font-size:11px;">One:18 Cleaning • Cleaning With Purpose</div>
+            </div>
+          </div>`
+        })
+      }).catch(e=>console.error('Accept email failed:',e));
+
+      screen.remove();
+      render();
+      toast('Job accepted — let\'s get to work!');
+    };
+  }
+
   async function boot(){
     // Directly query Supabase for this contractor's current in_progress job
     // PostgREST + RLS handle all permission filtering — no client-side email matching needed
@@ -1327,6 +1444,15 @@
 
   function render(){
     if(!current) return;
+
+    // Show acceptance screen for newly assigned jobs not yet accepted
+    if(!current.accepted && !viewingHistoryJob){
+      const existing = document.getElementById('acceptScreen');
+      if(!existing) showAcceptanceScreen();
+      return;
+    }
+    const existing = document.getElementById('acceptScreen');
+    if(existing) existing.remove();
     $('jobNameInput').value = current.name || '';
 
     // Populate read-only job detail fields
@@ -1354,11 +1480,13 @@
     renderPropertyPhotoRow();
     renderSafetyGate();
 
-    document.querySelectorAll('#serviceToggle button').forEach(b=>{
-      b.classList.toggle('active', b.dataset.level === current.serviceLevel);
-      b.disabled = isLocked();
-      b.style.opacity = isLocked() ? '0.5' : '';
-    });
+    // Show read-only service level badge — set by admin, not changeable by contractor
+    const svcLabels = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+    const svcBadgeWrap = $('serviceBadgeWrap');
+    if(svcBadgeWrap){
+      const lvl = current.serviceLevel || 'standard';
+      svcBadgeWrap.innerHTML = `<span style="display:inline-block;background:var(--navy);color:var(--gold);font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;letter-spacing:0.04em;">${svcLabels[lvl]||lvl}</span>`;
+    }
 
     // Lock job name input when submitted
     const jobNameEl = $('jobNameInput');
@@ -1379,6 +1507,12 @@
       SCHEMA.forEach(sec => root.appendChild(renderSection(sec)));
     }
     renderSubmitArea();
+
+    // Restore scroll position for this job (saved locally per device)
+    if(current.id){
+      const savedY = localStorage.getItem('scroll_' + current.id);
+      if(savedY) requestAnimationFrame(()=> window.scrollTo(0, parseInt(savedY, 10)));
+    }
   }
 
   function renderSubmitArea(){
@@ -1450,6 +1584,8 @@
         }
         scheduleSave(); render();
         toast('Job submitted to the office');
+        // Clear saved scroll — job is done
+        try{ if(current.id) localStorage.removeItem('scroll_' + current.id); }catch(e){}
 
         // Notify admin
         const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
@@ -1683,12 +1819,13 @@
 
   function renderChecklist(sec, state) {
     const wrap = document.createElement('div');
+    const noNA = !!sec.required;
     sec.items.forEach((text, i)=>{
       const hasPhotoOption = sec.itemPhotoIndices && sec.itemPhotoIndices.includes(i);
       const val = state.items ? state.items[i] : false;
       wrap.appendChild(checkRow(text, val, (newVal)=>{
         state.items[i] = newVal; scheduleSave(); render();
-      }));
+      }, false, noNA));
       if(hasPhotoOption) wrap.appendChild(renderItemPhotoStrip(state, i));
     });
     const deepOn = (current.serviceLevel === 'deep' || current.serviceLevel === 'move') && sec.deepItems;
@@ -1788,7 +1925,7 @@
     return strip;
   }
 
-  function checkRow(text, val, onChange, flag){
+  function checkRow(text, val, onChange, flag, noNA=false){
     const isNA = val === 'na';
     const isChecked = val === true;
     const row = document.createElement('div');
@@ -1797,17 +1934,20 @@
     const badge = flag === true ? '<span class="deep-flag">DEEP</span>'
                 : flag === 'move' ? '<span class="deep-flag" style="color:var(--green);border-color:var(--green)">MOVE</span>'
                 : '';
+    const naBtn = noNA ? '' : `<button class="na-btn${isNA?' active':''}" title="Mark as Not Applicable">${isNA?'N/A ✕':'N/A'}</button>`;
     row.innerHTML = `
       <input type="checkbox" id="${id}" ${isChecked?'checked':''} ${(isLocked()||isNA)?'disabled':''}>
       <label for="${id}">${escapeHtml(text)}${badge}</label>
-      <button class="na-btn${isNA?' active':''}" title="Mark as Not Applicable">${isNA?'N/A ✕':'N/A'}</button>
+      ${naBtn}
     `;
     if(!isLocked()){
       row.querySelector('input').addEventListener('change', e => onChange(e.target.checked ? true : false));
-      row.querySelector('.na-btn').addEventListener('click', e=>{
-        e.preventDefault();
-        onChange(isNA ? false : 'na');
-      });
+      if(!noNA){
+        row.querySelector('.na-btn').addEventListener('click', e=>{
+          e.preventDefault();
+          onChange(isNA ? false : 'na');
+        });
+      }
     }
     return row;
   }
@@ -1955,6 +2095,46 @@
   }
 
   /* ---------------- Top-level controls ---------------- */
+  // Save scroll position locally so contractor resumes where they left off
+  let scrollSaveTimer;
+  window.addEventListener('scroll', ()=>{
+    if(!current || !current.id) return;
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = setTimeout(()=>{
+      try{ localStorage.setItem('scroll_' + current.id, window.scrollY); }catch(e){}
+    }, 400);
+  }, { passive: true });
+
+  // Intercept phone back button — handle within app instead of navigating away
+  history.pushState(null, '', location.href);
+  window.addEventListener('popstate', ()=>{
+    // Always re-push so there's always a state to pop back to
+    history.pushState(null, '', location.href);
+
+    // Close the topmost open layer
+    if(document.getElementById('acceptScreen')) return; // acceptance screen — stay
+    if($('safetyModal') && $('safetyModal').classList.contains('open')){
+      $('safetyModal').classList.remove('open'); return;
+    }
+    if($('historySheet').classList.contains('open')){
+      $('historySheet').classList.remove('open'); return;
+    }
+    if(viewingHistoryJob){
+      viewingHistoryJob = false;
+      $('backToCurrentBtn').classList.remove('visible');
+      if(current) render(); else boot();
+      return;
+    }
+    if(detailsOpen){
+      detailsOpen = false;
+      $('detailsPanel').classList.remove('open');
+      $('toggleDetailsBtn').textContent = 'Job details ▾';
+      return;
+    }
+    // Nothing to close — stay in app, scroll to top
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
   $('jobNameInput').addEventListener('input', e=>{ current.name = e.target.value; scheduleSave(); });
 
   // Job details are read-only — set by admin on assignment
@@ -1964,10 +2144,6 @@
     $('detailsPanel').classList.toggle('open', detailsOpen);
     $('toggleDetailsBtn').textContent = 'Job details ' + (detailsOpen ? '▴' : '▾');
   };
-
-  document.querySelectorAll('#serviceToggle button').forEach(btn=>{
-    btn.onclick = ()=>{ current.serviceLevel = btn.dataset.level; scheduleSave(); render(); };
-  });
 
   /* ---------------- Settings / password change ---------------- */
   $('settingsBtn').onclick = ()=>{
