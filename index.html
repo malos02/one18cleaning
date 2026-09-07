@@ -1133,7 +1133,7 @@
       <div style="font-size:44px;margin-bottom:16px;">🏠</div>
       <h2 style="font-family:\'Fraunces\',serif;color:var(--navy);margin:0 0 10px;font-size:22px;">${title}</h2>
       <p style="color:var(--slate);font-size:14px;line-height:1.6;margin:0 0 28px;max-width:280px;">${message}</p>
-      <div style="font-size:12px;color:var(--slate);margin-bottom:6px;" id="waitingStatus">Checking for assigned jobs…</div>
+      <div style="font-size:12px;color:var(--slate);margin-bottom:6px;" id="waitingStatus">This page will be updated when a job is assigned.</div>
     `;
     document.body.appendChild(overlay);
 
@@ -1142,7 +1142,7 @@
     const poll = async ()=>{
       pollCount++;
       const el = document.getElementById('waitingStatus');
-      if(el) el.textContent = 'Checking for assigned jobs…';
+      if(el) el.textContent = 'Checking for your next job…';
       try{
         const res = await fetch(
           `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at&order=updated_at.desc`,
@@ -1163,7 +1163,7 @@
           }
         }
       }catch(e){ console.error('poll error', e); }
-      if(el) el.textContent = `No jobs assigned yet · checking again in 30s`;
+      if(el) el.textContent = 'This page will be updated when a job is assigned.';
       setTimeout(poll, 30000);
     };
     setTimeout(poll, 3000); // First check after 3s
@@ -1298,7 +1298,7 @@
 
     // No assigned in_progress job found — show waiting screen
     await loadJobsIndex();
-    showWaitingScreen('No Jobs Assigned', 'The office will assign you a job. This page checks automatically every 30 seconds.');
+    showWaitingScreen('No Jobs Assigned', 'This page will be updated when a job is assigned.');
   }
   async function deleteJobRemote(id){
     try{

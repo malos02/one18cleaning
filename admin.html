@@ -297,8 +297,8 @@
       <button id="createJobCloseBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--slate);">✕</button>
     </div>
     <div class="login-field">
-      <label>Assign to contractor (email)</label>
-      <input type="email" id="cjContractor" placeholder="e.g. calebo2g@hotmail.com">
+      <label>Assign contractor <span style="font-weight:400;color:var(--slate);">(optional — can assign later)</span></label>
+      <input type="email" id="cjContractor" placeholder="Leave blank to assign later">
     </div>
     <div class="login-field">
       <label>Client name</label>
@@ -524,7 +524,7 @@
   /* ---------------- Data ---------------- */
   async function loadAllJobs(){
     try{
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,submitted_at,created_by,assigned_to,updated_at&order=updated_at.desc`, { headers: authHeaders() });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,submitted_at,created_at,created_by,assigned_to,updated_at,approved_at,archived_at&order=updated_at.desc`, { headers: authHeaders() });
       if(!res.ok) throw new Error('Load failed: '+res.status);
       allJobs = await res.json();
     }catch(e){ console.error(e); allJobs = []; }
@@ -811,7 +811,19 @@
     updateModeTabs();
     renderDetail();
     $('detailOverlay').classList.add('open');
+    history.pushState({view:'detail'}, '');
   }
+
+  // Phone back button — close detail overlay instead of leaving the page
+  history.pushState({view:'list'}, '');
+  window.addEventListener('popstate', ()=>{
+    history.pushState({view:'list'}, ''); // always keep a state to pop to
+    if($('detailOverlay').classList.contains('open')){
+      $('detailOverlay').classList.remove('open');
+      currentDetailJob = null;
+      renderList();
+    }
+  });
 
   function updateModeTabs(){
     $('viewTabBtn').classList.toggle('active', detailMode === 'view');
@@ -1450,10 +1462,9 @@
     const date = $('cjDate').value;
     const err = $('cjError');
     err.classList.remove('show');
-    if(!contractor){ err.textContent='Enter the contractor\'s email'; err.classList.add('show'); return; }
-    if(!contractor.includes('@')){ err.textContent='Enter a valid email address'; err.classList.add('show'); return; }
+    if(contractor && !contractor.includes('@')){ err.textContent='Enter a valid email address'; err.classList.add('show'); return; }
 
-    // Duplicate detection — check existing jobs for same client+address or same address+date
+    // Duplicate detection
     const duplicates = allJobs.filter(j=>{
       const d = j.data || {};
       if(j.status === 'archived') return false;
