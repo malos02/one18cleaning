@@ -1058,13 +1058,14 @@
     }
     try{
       // Use PATCH (UPDATE) not POST upsert — job already exists, UPDATE policy allows assigned_to
+      const isSubmitted = current.status === 'submitted';
       const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(current.id)}`, {
         method: 'PATCH',
         headers: { ...authHeaders(), 'Prefer': 'return=minimal', 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data: current,
           status: current.status || 'in_progress',
-          submitted_at: current.submittedAt ? new Date(current.submittedAt).toISOString() : null,
+          submitted_at: isSubmitted && current.submittedAt ? new Date(current.submittedAt).toISOString() : null,
           updated_at: new Date(current.updatedAt).toISOString()
         })
       });
