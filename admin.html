@@ -524,7 +524,7 @@
   /* ---------------- Data ---------------- */
   async function loadAllJobs(){
     try{
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,submitted_at,created_at,created_by,assigned_to,updated_at,approved_at,archived_at&order=updated_at.desc`, { headers: authHeaders() });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,submitted_at,created_by,assigned_to,updated_at,approved_at,archived_at&order=updated_at.desc`, { headers: authHeaders() });
       if(!res.ok) throw new Error('Load failed: '+res.status);
       allJobs = await res.json();
     }catch(e){ console.error(e); allJobs = []; }
@@ -1386,8 +1386,8 @@
     const entries = [];
     const fmt = ts => ts ? new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
 
-    // Job created
-    entries.push({ dot:'gold', action:'Job created', meta: fmt(j.created_at || d.createdAt) + (j.created_by ? ` · by ${j.created_by}` : '') });
+    // Job created (use updated_at as earliest available timestamp)
+    entries.push({ dot:'gold', action:'Job created', meta: fmt(j.updated_at || d.createdAt) + (j.created_by ? ` · by ${j.created_by}` : '') });
 
     // Assignment history
     if(d.assignmentHistory && d.assignmentHistory.length){
