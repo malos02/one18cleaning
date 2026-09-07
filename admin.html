@@ -1679,6 +1679,10 @@
     if(!contractorEmail){ alert('No contractor assigned to this job.'); return; }
     if(!confirm(`Approve this job and notify ${contractorEmail}?`)) return;
 
+    // Disable button immediately so it can't be double-tapped
+    $('approveJobBtn').disabled = true;
+    $('approveJobBtn').textContent = 'Approving…';
+
     try{
       d.approvedAt = Date.now();
       d.status = 'approved';
@@ -1689,9 +1693,15 @@
       if(!res.ok) throw new Error('Could not approve');
       j.status = 'approved';
 
-      // Send approval email to contractor
+      // Update UI immediately — don't wait for email
+      toast('Job approved ✓ — notifying contractor…');
+      renderDetail();
+      await loadAllJobs();
+      renderList();
+
+      // Send email in background (non-blocking)
       const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
-      await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           secret: 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg',
@@ -1718,13 +1728,13 @@
             </div>
           </div>`
         })
-      });
+      }).catch(e=>console.error('Approval email failed:',e));
 
-      toast('Job approved — contractor notified by email');
-      renderDetail();
-      await loadAllJobs();
-      renderList();
-    }catch(e){ alert('Could not approve job: ' + e.message); }
+    }catch(e){
+      alert('Could not approve job: ' + e.message);
+      $('approveJobBtn').disabled = false;
+      $('approveJobBtn').textContent = '✓ Approve';
+    }
   };
 
   $('archiveJobBtn').onclick = async ()=>{
