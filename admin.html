@@ -630,10 +630,14 @@
       const paidBadge = d.payment
         ? `<div style="font-size:11px;font-weight:700;color:#1A6B9A;margin-top:2px;">💰 Paid $${parseFloat(d.payment.amount||0).toFixed(0)} · ${d.payment.date||''}</div>`
         : '';
-      const contractorDisplay = d.assignedName || j.assigned_to || d.assignedTo || 'Unassigned';
-      const contractorLine = (j.created_by === 'gmail-import' || j.created_by === 'one18cleaning@gmail.com')
-        ? '👤 Assigned to: ' + escapeHtml(contractorDisplay)
-        : 'By ' + escapeHtml(j.created_by || '');
+
+      // Contractor name — from lookup table first, then stored name, then email
+      const assignedEmail = j.assigned_to || d.assignedTo;
+      const assignedName = getContractorName(assignedEmail) || d.assignedName || assignedEmail || null;
+      const assignedLine = assignedName
+        ? `<div class="jm" style="font-weight:600; color:var(--navy);">Assigned to: ${escapeHtml(assignedName)}</div>`
+        : `<div class="jm" style="color:var(--slate); font-style:italic;">Unassigned</div>`;
+
       const statusLabel = isArchived ? 'Archived' : j.status === 'approved' ? 'Approved ✓' : j.status === 'submitted' ? 'Submitted' : 'In Progress';
 
       card.innerHTML = `
@@ -641,8 +645,8 @@
           ${thumbHtml}
           <div class="job-info">
             <div class="jn">${escapeHtml(d.name || d.client || 'Untitled job')}</div>
-            <div class="jm">${escapeHtml(d.client || '')}${d.address ? (d.client ? ' · ' : '') + escapeHtml(d.address) : ''}</div>
-            <div class="jm">${contractorLine}${d.date ? ' · 📅 '+escapeHtml(d.date) : ''}</div>
+            ${assignedLine}
+            <div class="jm">${escapeHtml(d.client || '')}${d.address ? (d.client ? ' · ' : '') + escapeHtml(d.address) : ''}${d.date ? ' · '+escapeHtml(d.date) : ''}</div>
             ${modifiedBadge}${paidBadge}
           </div>
           <div class="job-side">
@@ -867,7 +871,7 @@
     const d = j.data || {};
     $('detailTitle').textContent = d.name || 'Untitled job';
     const dt = j.updated_at ? new Date(j.updated_at).toLocaleString() : '';
-    const contractorDisplay = d.assignedName || j.assigned_to || 'Unassigned';
+    const contractorDisplay = getContractorName(j.assigned_to || d.assignedTo) || d.assignedName || j.assigned_to || 'Unassigned';
     const statusLabel = j.status === 'approved' ? 'Approved ✓' : j.status === 'submitted' ? 'Submitted' : j.status === 'archived' ? 'Archived' : 'In Progress';
     $('detailSub').textContent = `Assigned to: ${contractorDisplay} · ${statusLabel}${dt ? ' · Updated '+dt : ''}`;
     $('archiveJobBtn').textContent = j.status === 'archived' ? 'Unarchive' : 'Archive';
@@ -1239,11 +1243,21 @@
 
   /* ---------------- Contractors data ---------------- */
   let contractors = [];
+  let contractorNameMap = {}; // email → name
   async function loadContractors(){
     try{
       const res = await fetch(`${SUPABASE_URL}/rest/v1/contractors?select=*&active=eq.true&order=name`, { headers: authHeaders() });
-      if(res.ok) contractors = await res.json();
+      if(res.ok){
+        contractors = await res.json();
+        contractorNameMap = {};
+        contractors.forEach(c=>{ contractorNameMap[c.email] = c.name; });
+      }
     }catch(e){ console.error('Could not load contractors', e); }
+  }
+
+  function getContractorName(email){
+    if(!email) return null;
+    return contractorNameMap[email] || null;
   }
 
   function renderContractors(){
