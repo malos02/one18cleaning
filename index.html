@@ -1170,6 +1170,30 @@
     setTimeout(poll, 3000); // First check after 3s
   }
 
+  /* ---- Pay Schedule ---- */
+  const PAY_TIERS = [
+    { maxSqFt:1200,     label:'Under 1,200 sq ft',    key:'t1' },
+    { maxSqFt:2000,     label:'1,200–2,000 sq ft',     key:'t2' },
+    { maxSqFt:3000,     label:'2,001–3,000 sq ft',     key:'t3' },
+    { maxSqFt:4000,     label:'3,001–4,000 sq ft',     key:'t4' },
+    { maxSqFt:5000,     label:'4,001–5,000 sq ft',     key:'t5' },
+    { maxSqFt:Infinity, label:'5,000+ sq ft',           key:'custom' },
+  ];
+  const PAY_BASE = {
+    standard:{ t1:'$60–$70',   t2:'$70–$90',   t3:'$90–$115',  t4:'$115–$145', t5:'$145–$180', custom:'Custom rate' },
+    deep:    { t1:'$125–$145', t2:'$145–$190',  t3:'$190–$250', t4:'$250–$320', t5:'$320–$390', custom:'Custom rate' },
+    move:    { t1:'$145–$165', t2:'$165–$215',  t3:'$215–$275', t4:'$275–$345', t5:'$345–$415', custom:'Custom rate' },
+  };
+
+  function getPayEstimate(serviceLevel, homeSize){
+    if(!serviceLevel) return null;
+    const sqFt = homeSize ? parseInt(String(homeSize).replace(/,/g,'').match(/\d+/)?.[0]||'0') : 0;
+    if(!sqFt) return { range: 'See pay schedule', label: 'Home size not provided' };
+    const tier = PAY_TIERS.find(t => sqFt <= t.maxSqFt) || PAY_TIERS[PAY_TIERS.length-1];
+    const base = PAY_BASE[serviceLevel] || PAY_BASE.standard;
+    return { range: base[tier.key], label: tier.label, sqFt };
+  }
+
   function showAcceptanceScreen(){
     const d = current;
     const svcLabels = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
@@ -1218,6 +1242,16 @@
           </div>
         </div>
         ${d.notes ? `<div class="accept-notes">📝 <strong>Note from office:</strong> ${escapeHtml(d.notes)}</div>` : ''}
+        ${(()=>{
+          const pe = getPayEstimate(d.serviceLevel, d.homeSize);
+          if(!pe) return '';
+          return `<div style="background:#FFF8EE; border:1.5px solid #E8D9B5; border-radius:14px; padding:14px 16px; margin-bottom:20px;">
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#9A7040; margin-bottom:4px;">💵 Estimated Pay</div>
+            <div style="font-size:22px; font-weight:900; color:var(--navy); line-height:1.1;">${escapeHtml(pe.range)}</div>
+            <div style="font-size:11.5px; color:var(--slate); margin-top:2px;">${escapeHtml(pe.label)}${pe.sqFt ? ' · '+pe.sqFt+' sq ft' : ''}</div>
+            <div style="font-size:10.5px; color:var(--slate); margin-top:6px; font-style:italic;">Final compensation disclosed before acceptance per your contractor agreement.</div>
+          </div>`;
+        })()}
         <button class="accept-btn" id="acceptJobBtn">✓ Accept Job</button>
         <div class="accept-footer">By accepting, you confirm you've reviewed the job details and are ready to complete this service.</div>
       </div>

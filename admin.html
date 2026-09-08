@@ -1544,16 +1544,28 @@
               </div>
               <div style="padding:32px 24px; background:#FAF6EE;">
                 <h2 style="margin:0 0 16px; font-size:20px;">Hi ${escapeHtml(name)}, you have a new job!</h2>
-                <div style="background:#fff; border:1.5px solid #E4DCCB; border-radius:12px; padding:20px 24px; margin-bottom:24px;">
+                <div style="background:#fff; border:1.5px solid #E4DCCB; border-radius:12px; padding:20px 24px; margin-bottom:16px;">
                   <div style="font-size:12px; color:#6B7A8C; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px;">Job details</div>
                   ${d.client ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Client: </span><strong>${escapeHtml(d.client)}</strong></div>` : ''}
                   ${d.address ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Address: </span><strong>${escapeHtml(d.address)}</strong></div>` : ''}
                   ${d.date ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Date: </span><strong>${escapeHtml(d.date)}</strong></div>` : ''}
-                  ${d.serviceLevel ? `<div style="margin-bottom:16px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabel[d.serviceLevel]||d.serviceLevel}</strong></div>` : ''}
-                  ${d.notes ? `<div style="margin-bottom:16px;"><span style="color:#6B7A8C;">Notes: </span>${escapeHtml(d.notes)}</div>` : ''}
-                  <a href="https://malos02.github.io/one18cleaning/" style="display:block; background:#16283F; color:#fff; text-align:center; padding:12px; border-radius:9px; text-decoration:none; font-weight:700; font-size:15px;">Open Contractor App</a>
+                  ${d.serviceLevel ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabel[d.serviceLevel]||d.serviceLevel}</strong></div>` : ''}
+                  ${d.notes ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Notes: </span>${escapeHtml(d.notes)}</div>` : ''}
+                  ${(()=>{
+                    if(!d.serviceLevel) return '';
+                    const addonItems = d.sections && d.sections.addons && d.sections.addons.items ? d.sections.addons.items : {};
+                    const pe = getEstimatedPay(d.serviceLevel, d.homeSize, addonItems);
+                    return `<div style="margin-top:14px; background:#FFF8EE; border:1px solid #E8D9B5; border-radius:9px; padding:12px 14px;">
+                      <div style="font-size:10px; font-weight:700; color:#9A7040; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Estimated Pay</div>
+                      <div style="font-size:18px; font-weight:800; color:#16283F;">${pe.total}</div>
+                      <div style="font-size:11px; color:#6B7A8C;">${pe.label}${d.homeSize ? ' · ' + escapeHtml(d.homeSize) : ''}</div>
+                    </div>`;
+                  })()}
+                  <div style="margin-top:16px;">
+                    <a href="https://malos02.github.io/one18cleaning/" style="display:block; background:#16283F; color:#fff; text-align:center; padding:12px; border-radius:9px; text-decoration:none; font-weight:700; font-size:15px;">Open Contractor App</a>
+                  </div>
                 </div>
-                <p style="margin:0; font-size:13px; color:#6B7A8C;">Log in to the app to access your full checklist for this job.</p>
+                <p style="margin:0; font-size:13px; color:#6B7A8C;">Log in to the app to review the job details and accept your assignment.</p>
               </div>
               <div style="background:#16283F; padding:16px 24px; text-align:center;">
                 <div style="color:rgba(255,255,255,0.5); font-size:11px;">One:18 Cleaning • Cleaning With Purpose • Greater Houston Area</div>
@@ -1764,6 +1776,46 @@
         body: JSON.stringify({ data: d })
       });
       j.data = d;
+
+      // Notify contractor of payment
+      const contractorEmail = j.assigned_to || d.assignedTo || d.createdBy;
+      if(contractorEmail){
+        const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In / Move-Out'};
+        fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            secret: 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg',
+            to: contractorEmail,
+            subject: `💰 Payment Sent — $${parseFloat(amount).toFixed(2)} | One:18 Cleaning`,
+            html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;">
+              <div style="background:#16283F;padding:24px;text-align:center;">
+                <div style="color:#C79A5D;font-size:20px;font-weight:700;">ONE:18 CLEANING</div>
+                <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;">PAYMENT NOTIFICATION</div>
+              </div>
+              <div style="padding:28px 24px;background:#FAF6EE;">
+                <h2 style="margin:0 0 6px;color:#20303F;font-size:19px;">Your payment has been sent!</h2>
+                <p style="margin:0 0 20px;color:#6B7A8C;font-size:14px;">Payment for the following job has been processed.</p>
+                <div style="background:#fff;border:1.5px solid #E4DCCB;border-radius:12px;padding:20px;margin-bottom:16px;">
+                  ${d.client?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Client: </span><strong>${d.client}</strong></div>`:''}
+                  ${d.address?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Address: </span><strong>${d.address}</strong></div>`:''}
+                  ${d.date?`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Service Date: </span><strong>${d.date}</strong></div>`:''}
+                  <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Service: </span><strong>${svcLabel[d.serviceLevel]||d.serviceLevel||'Standard'}</strong></div>
+                  <div style="margin-top:14px;background:#EAF2ED;border-radius:10px;padding:14px 16px;">
+                    <div style="font-size:11px;font-weight:700;color:#4B7A5E;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Amount Paid</div>
+                    <div style="font-size:28px;font-weight:900;color:#16283F;">$${parseFloat(amount).toFixed(2)}</div>
+                    <div style="font-size:12px;color:#6B7A8C;margin-top:2px;">${date ? 'Paid on '+date : 'Payment processed'}${notes ? ' · '+notes : ''}</div>
+                  </div>
+                </div>
+                <p style="font-size:12.5px;color:#6B7A8C;margin:0;">Questions about this payment? Contact the office directly.</p>
+              </div>
+              <div style="background:#16283F;padding:12px 24px;text-align:center;">
+                <div style="color:rgba(255,255,255,0.5);font-size:11px;">One:18 Cleaning • Cleaning With Purpose</div>
+              </div>
+            </div>`
+          })
+        }).catch(e=>console.error('Payment email failed:',e));
+      }
+
       $('paymentModal').style.display = 'none';
       $('markPaidBtn').style.display = 'none';
       toast(`Payment of $${amount.toFixed(2)} recorded`);
