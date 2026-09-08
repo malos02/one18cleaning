@@ -1204,14 +1204,44 @@
     deep:    { t1:'$125–$145', t2:'$145–$190',  t3:'$190–$250', t4:'$250–$320', t5:'$320–$390', custom:'Custom rate' },
     move:    { t1:'$145–$165', t2:'$165–$215',  t3:'$215–$275', t4:'$275–$345', t5:'$345–$415', custom:'Custom rate' },
   };
+  const PAY_ADDONS_CT = {
+    windows:    { label:'Interior Windows', t1:25,  t2:35,  t3:50,  t4:65,  t5:85,  includedIn:['deep','move'] },
+    baseboards: { label:'Baseboards',       t1:20,  t2:30,  t3:40,  t4:50,  t5:65,  includedIn:['deep','move'] },
+    blinds:     { label:'Blinds',           t1:15,  t2:25,  t3:35,  t4:45,  t5:55,  includedIn:['deep','move'] },
+    fans:       { label:'Fans/Fixtures',    t1:15,  t2:20,  t3:25,  t4:35,  t5:45,  includedIn:['deep','move'] },
+    cabinets:   { label:'Cabinet Interiors',t1:25,  t2:35,  t3:50,  t4:60,  t5:75,  includedIn:['move'] },
+    pethair:    { label:'Pet Hair',         t1:15,  t2:20,  t3:30,  t4:40,  t5:50,  includedIn:[] },
+    garage:     { label:'Garage',           t1:20,  t2:25,  t3:30,  t4:40,  t5:50,  includedIn:[] },
+    patio:      { label:'Patio/Porch',      t1:15,  t2:20,  t3:25,  t4:35,  t5:45,  includedIn:[] },
+  };
 
-  function getPayEstimate(serviceLevel, homeSize){
+  function getPayEstimate(serviceLevel, homeSize, addons){
     if(!serviceLevel) return null;
     const sqFt = homeSize ? parseInt(String(homeSize).replace(/,/g,'').match(/\d+/)?.[0]||'0') : 0;
     if(!sqFt) return { range: 'See pay schedule', label: 'Home size not provided' };
     const tier = PAY_TIERS.find(t => sqFt <= t.maxSqFt) || PAY_TIERS[PAY_TIERS.length-1];
     const base = PAY_BASE[serviceLevel] || PAY_BASE.standard;
-    return { range: base[tier.key], label: tier.label, sqFt };
+    const baseRange = base[tier.key];
+    if(tier.key === 'custom') return { range: baseRange, label: tier.label, sqFt, addonsTotal: 0 };
+
+    // Add add-on pay
+    let addTotal = 0;
+    const addLabels = [];
+    if(addons && typeof addons === 'object'){
+      Object.entries(PAY_ADDONS_CT).forEach(([key, ao])=>{
+        if(addons[key] === true && !ao.includedIn.includes(serviceLevel)){
+          addTotal += ao[tier.key] || 0;
+          addLabels.push(ao.label);
+        }
+      });
+    }
+
+    if(addTotal > 0){
+      const nums = baseRange.replace(/\$/g,'').split('–').map(n=>parseInt(n.trim()));
+      const total = `$${nums[0]+addTotal}–$${(nums[1]||nums[0])+addTotal}`;
+      return { range: total, label: tier.label, sqFt, addonsTotal: addTotal, addLabels };
+    }
+    return { range: baseRange, label: tier.label, sqFt, addonsTotal: 0 };
   }
 
   function showAcceptanceScreen(){
@@ -1263,7 +1293,7 @@
         </div>
         ${d.notes ? `<div class="accept-notes">📝 <strong>Note from office:</strong> ${escapeHtml(d.notes)}</div>` : ''}
         ${(()=>{
-          const pe = getPayEstimate(d.serviceLevel, d.homeSize);
+          const pe = getPayEstimate(d.serviceLevel, d.homeSize, d.addons || {});
           if(!pe) return '';
           return `<div style="background:#FFF8EE; border:1.5px solid #E8D9B5; border-radius:14px; padding:14px 16px; margin-bottom:20px;">
             <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#9A7040; margin-bottom:4px;">💵 Estimated Pay</div>
@@ -1325,33 +1355,47 @@
   }
 
   async function boot(){
-    // Directly query Supabase for this contractor's current in_progress job
-    // PostgREST + RLS handle all permission filtering — no client-side email matching needed
-    try{
+    // Show a minimal loading state — prevents flash of "No Jobs Assigned"
+    const loadingEl = document.createElement('div');
+    loadingEl.id = 'bootLoading';
+    loadingEl.style.cssText = 'position:fixed;inset:0;background:var(--cream);z-index:50;display:flex;align-items:center;justify-content:center;';
+    loadingEl.innerHTML = `<div style="text-align:center;"><div class="seal" style="margin:0 auto 12px;"></div><div style="color:var(--slate);font-size:13px;">Loading your job…</div></div>`;
+    document.body.appendChild(loadingEl);
+
+    const removeLoader = ()=>{ const el = document.getElementById('bootLoading'); if(el) el.remove(); };
+
+    const tryFetch = async ()=>{
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at&order=updated_at.desc`,
+        `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at,assigned_to&order=updated_at.desc`,
         { headers: authHeaders() }
       );
-      if(!res.ok) throw new Error('fetch failed');
-      const rows = await res.json();
+      if(!res.ok) throw new Error('fetch failed: '+res.status);
+      return res.json();
+    };
 
-      // RLS already restricts to this contractor's accessible jobs
-      // Pick most recent in_progress assigned job (assigned_to not null)
+    try{
+      let rows;
+      try{ rows = await tryFetch(); }
+      catch(e){
+        // One silent retry after 2s (token may still be initializing)
+        await new Promise(r=>setTimeout(r,2000));
+        rows = await tryFetch();
+      }
+
       const assigned = rows.filter(r => r.data && !r.data.removedByAdmin);
-
       if(assigned.length){
-        const job = assigned[0].data;
-        // Persist DB-level assigned_to into job data so saves include it
-        if(!job.assignedTo && assigned[0].assigned_to) job.assignedTo = assigned[0].assigned_to;
+        const row = assigned[0];
+        const job = row.data;
+        if(!job.assignedTo && row.assigned_to) job.assignedTo = row.assigned_to;
         current = job;
-        // Also rebuild jobsIndex for history/other uses
         await loadJobsIndex();
+        removeLoader();
         render();
         return;
       }
     }catch(e){ console.error('boot fetch error', e); }
 
-    // No assigned in_progress job found — show waiting screen
+    removeLoader();
     await loadJobsIndex();
     showWaitingScreen('No Jobs Assigned', 'This page will be updated when a job is assigned.');
   }
@@ -1568,12 +1612,13 @@
       $('notesRow').style.display = 'none';
     }
 
-    // Estimated pay + home size
-    const pe = getPayEstimate(current.serviceLevel, current.homeSize);
+    // Estimated pay + home size (including any add-ons)
+    const addons = current.addons || (current.sections && current.sections.addons && current.sections.addons.items) || {};
+    const pe = getPayEstimate(current.serviceLevel, current.homeSize, addons);
     const sizePayRow = $('sizePayRow');
     if(pe && pe.range && pe.range !== 'See pay schedule' && sizePayRow){
-      $('homeSizeDisplay').textContent = pe.sqFt ? pe.sqFt.toLocaleString() + ' sq ft · ' + pe.label : pe.label;
-      $('payDisplay').textContent = pe.range;
+      $('homeSizeDisplay').textContent = pe.sqFt ? pe.sqFt.toLocaleString()+' sq ft · '+pe.label : pe.label;
+      $('payDisplay').textContent = pe.range + (pe.addLabels && pe.addLabels.length ? ' (incl. '+pe.addLabels.join(', ')+')' : '');
       sizePayRow.style.display = '';
     } else if(sizePayRow){
       sizePayRow.style.display = 'none';
