@@ -908,36 +908,6 @@
     const statusLabel = j.status === 'approved' ? 'Approved ✓' : j.status === 'submitted' ? 'Submitted' : j.status === 'archived' ? 'Archived' : 'In Progress';
     $('detailSub').textContent = `Assigned to: ${contractorDisplay} · ${statusLabel}${dt ? ' · Updated '+dt : ''}`;
 
-      // Estimated pay block
-      const existingPayBlock = body.querySelector('.pay-estimate-block');
-      if(existingPayBlock) existingPayBlock.remove();
-      if(j.assigned_to && d.serviceLevel && !d.payment){
-        const addonItems = d.sections && d.sections.addons && d.sections.addons.items ? d.sections.addons.items : {};
-        const payEst = getEstimatedPay(d.serviceLevel, d.homeSize, addonItems);
-        const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In/Move-Out'}[d.serviceLevel]||d.serviceLevel;
-        const payBlock = document.createElement('div');
-        payBlock.className = 'pay-estimate-block';
-        payBlock.style.cssText = 'background:#FFF8EE; border:1.5px solid #E8D9B5; border-radius:12px; padding:14px 16px; margin-bottom:14px;';
-        let addonsHtml = '';
-        if(payEst.addons && payEst.addons.length){
-          addonsHtml = `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #E8D9B5;">
-            <div style="font-size:10px; font-weight:700; color:#9A7040; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">+ Add-ons</div>
-            ${payEst.addons.map(a=>`<div style="font-size:12px; color:var(--slate); display:flex; justify-content:space-between;"><span>${escapeHtml(a.label)}</span><span style="font-weight:600;">${escapeHtml(a.pay)}</span></div>`).join('')}
-          </div>`;
-        }
-        payBlock.innerHTML = `
-          <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
-            <span style="font-size:20px;">💵</span>
-            <div style="flex:1;">
-              <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#9A7040;">Estimated Contractor Pay</div>
-              <div style="font-size:18px; font-weight:800; color:var(--navy);">${escapeHtml(payEst.total)}</div>
-              <div style="font-size:11.5px; color:var(--slate);">${escapeHtml(payEst.label)}${d.homeSize ? ' · '+escapeHtml(d.homeSize) : ''} · ${svcLabel}</div>
-            </div>
-          </div>
-          ${addonsHtml}
-        `;
-        body.insertBefore(payBlock, body.firstChild);
-      }
     $('archiveJobBtn').textContent = j.status === 'archived' ? 'Unarchive' : 'Archive';
     $('approveJobBtn').style.display = j.status === 'submitted' ? 'block' : 'none';
     $('markPaidBtn').style.display = (j.status === 'approved' && !d.payment) ? 'block' : 'none';
@@ -946,6 +916,35 @@
 
     const body = $('detailBody');
     body.innerHTML = '';
+
+    // Estimated pay block — top of detail view
+    if(j.assigned_to && d.serviceLevel && !d.payment){
+      const addonItems = d.sections && d.sections.addons && d.sections.addons.items ? d.sections.addons.items : {};
+      const payEst = getEstimatedPay(d.serviceLevel, d.homeSize, addonItems);
+      const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In/Move-Out'}[d.serviceLevel]||d.serviceLevel;
+      const payBlock = document.createElement('div');
+      payBlock.className = 'pay-estimate-block';
+      payBlock.style.cssText = 'background:#FFF8EE; border:1.5px solid #E8D9B5; border-radius:12px; padding:14px 16px; margin-bottom:14px;';
+      let addonsHtml = '';
+      if(payEst.addons && payEst.addons.length){
+        addonsHtml = `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #E8D9B5;">
+          <div style="font-size:10px; font-weight:700; color:#9A7040; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">+ Add-ons</div>
+          ${payEst.addons.map(a=>`<div style="font-size:12px; color:var(--slate); display:flex; justify-content:space-between;"><span>${escapeHtml(a.label)}</span><span style="font-weight:600;">${escapeHtml(a.pay)}</span></div>`).join('')}
+        </div>`;
+      }
+      payBlock.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+          <span style="font-size:20px;">💵</span>
+          <div style="flex:1;">
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#9A7040;">Estimated Contractor Pay</div>
+            <div style="font-size:18px; font-weight:800; color:var(--navy);">${escapeHtml(payEst.total)}</div>
+            <div style="font-size:11.5px; color:var(--slate);">${escapeHtml(payEst.label)}${d.homeSize ? ' · '+escapeHtml(d.homeSize) : ''} · ${svcLabel}</div>
+          </div>
+        </div>
+        ${addonsHtml}
+      `;
+      body.appendChild(payBlock);
+    }
 
     // Show edit ledger if there are any entries
     const ledger = d.editLedger || [];
