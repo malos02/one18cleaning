@@ -1387,11 +1387,15 @@
         const row = assigned[0];
         const job = row.data;
         if(!job.assignedTo && row.assigned_to) job.assignedTo = row.assigned_to;
+        const wasEmpty = !job.sections || Object.keys(job.sections).length === 0 ||
+          Object.values(job.sections).some(s => s && !Array.isArray(s) && s.items && Object.keys(s.items).length === 0);
         ensureSections(job); // heal empty sections for admin-created jobs
         current = job;
         await loadJobsIndex();
         removeLoader();
         render();
+        // Persist healed sections so next load has them
+        if(wasEmpty) saveCurrent();
         return;
       }
     }catch(e){ console.error('boot fetch error', e); }
@@ -1435,10 +1439,24 @@
       } else if(sec.repeatable){
         if(!job.sections[sec.key] || !Array.isArray(job.sections[sec.key]) || job.sections[sec.key].length === 0){
           job.sections[sec.key] = [{ id: uid(), label: sec.instanceLabel+' 1', items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} }];
+        } else {
+          // Ensure each instance has items populated
+          job.sections[sec.key].forEach(inst=>{
+            if(!inst.items || Object.keys(inst.items).length === 0){
+              inst.items = blankItemState(sec.items);
+            }
+          });
         }
       } else {
-        if(!job.sections[sec.key] || !job.sections[sec.key].items){
-          job.sections[sec.key] = { items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} };
+        const existing = job.sections[sec.key];
+        // Refill if missing OR if items object is empty {}
+        if(!existing || !existing.items || Object.keys(existing.items).length === 0){
+          job.sections[sec.key] = {
+            items: blankItemState(sec.items),
+            photos: (existing && existing.photos) || [],
+            itemPhotos: (existing && existing.itemPhotos) || {},
+            itemNotes: (existing && existing.itemNotes) || {}
+          };
         }
       }
     });
