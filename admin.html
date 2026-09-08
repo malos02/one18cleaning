@@ -1995,7 +1995,21 @@
       serviceLevel: $('cjServiceLevel').value || 'standard',
       homeSize: $('cjHomeSizeExact').value.trim() || $('cjHomeSize').value || '',
       notes: $('cjNotes') ? $('cjNotes').value.trim() : '',
-      sections: {},
+      sections: (function(){
+        // Pre-populate all SOP sections so contractor sees a full checklist on first open
+        // Keys match SCHEMA in the contractor app
+        const uid = ()=>Math.random().toString(36).slice(2,9);
+        return {
+          arrival:    { items: {}, photos: [], itemPhotos: {}, itemNotes: {} },
+          kitchen:    { items: {}, photos: [], itemPhotos: {}, itemNotes: {} },
+          bathrooms:  [{ id: uid(), label: 'Bathroom 1', items: {}, photos: [], itemPhotos: {}, itemNotes: {} }],
+          bedrooms:   [{ id: uid(), label: 'Bedroom 1',  items: {}, photos: [], itemPhotos: {}, itemNotes: {} }],
+          living:     { items: {}, photos: [], itemPhotos: {}, itemNotes: {} },
+          floors:     { items: {}, photos: [], itemPhotos: {}, itemNotes: {} },
+          walkthrough:{ items: {}, photos: [], itemPhotos: {}, itemNotes: {} },
+          addons:     { items: {} }
+        };
+      })(),
       status: 'in_progress',
       createdBy: session ? session.email : null,
       createdAt: Date.now(),

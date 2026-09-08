@@ -1387,6 +1387,7 @@
         const row = assigned[0];
         const job = row.data;
         if(!job.assignedTo && row.assigned_to) job.assignedTo = row.assigned_to;
+        ensureSections(job); // heal empty sections for admin-created jobs
         current = job;
         await loadJobsIndex();
         removeLoader();
@@ -1423,6 +1424,27 @@
     const sec = SCHEMA.find(s=>s.key===key);
     return sec.items;
   }
+  // Heal jobs created via admin that have empty/missing sections
+  // Safe to run on any job — only fills in what's missing, never overwrites checked items
+  function ensureSections(job){
+    if(!job) return job;
+    if(!job.sections) job.sections = {};
+    SCHEMA.forEach(sec=>{
+      if(sec.isAddons){
+        if(!job.sections[sec.key]) job.sections[sec.key] = { items: {} };
+      } else if(sec.repeatable){
+        if(!job.sections[sec.key] || !Array.isArray(job.sections[sec.key]) || job.sections[sec.key].length === 0){
+          job.sections[sec.key] = [{ id: uid(), label: sec.instanceLabel+' 1', items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} }];
+        }
+      } else {
+        if(!job.sections[sec.key] || !job.sections[sec.key].items){
+          job.sections[sec.key] = { items: blankItemState(sec.items), photos: [], itemPhotos: {}, itemNotes: {} };
+        }
+      }
+    });
+    return job;
+  }
+
   function newJob(name){
     const sections = {};
     SCHEMA.forEach(sec=>{
@@ -1849,10 +1871,20 @@
 
   function renderSection(sec){
     if(sec.isAddons) return renderAddonsSection(sec);
-    const card = document.createElement('div');
-    card.className = 'section-card' + (expandedKeys.has(sec.key) ? ' expanded' : '');
+
+    // Initialize missing section state — manually created jobs start with sections: {}
+    if(!current.sections) current.sections = {};
 
     if(sec.repeatable){
+      if(!current.sections[sec.key] || !Array.isArray(current.sections[sec.key])){
+        current.sections[sec.key] = [{
+          id: uid(),
+          label: `${sec.instanceLabel} 1`,
+          items: blankItemState(sec, current),
+          photos: [], itemPhotos: {}, itemNotes: {}
+        }];
+        scheduleSave();
+      }
       const instances = current.sections[sec.key];
       let totalDone=0, totalCount=0;
       instances.forEach(inst=>{ const c=sectionCounts(sec, inst, current); totalDone+=c.done; totalCount+=c.total; });
