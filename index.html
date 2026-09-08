@@ -642,10 +642,30 @@
         <div class="field-value" id="addressDisplay">—</div>
       </div>
     </div>
+    <div class="field-row" id="contactRow" style="display:none;">
+      <div class="field" id="emailFieldWrap" style="display:none;">
+        <label>Client email</label>
+        <div class="field-value" id="clientEmailDisplay" style="color:var(--slate); font-size:13px;"></div>
+      </div>
+      <div class="field" id="phoneFieldWrap" style="display:none;">
+        <label>Client phone</label>
+        <div class="field-value" id="clientPhoneDisplay" style="color:var(--slate); font-size:13px;"></div>
+      </div>
+    </div>
     <div class="field-row" id="notesRow" style="display:none;">
       <div class="field">
         <label>Notes from office</label>
         <div class="field-value" id="notesDisplay" style="font-style:italic; color:var(--slate);"></div>
+      </div>
+    </div>
+    <div class="field-row" id="sizePayRow" style="display:none;">
+      <div class="field">
+        <label>Home size</label>
+        <div class="field-value" id="homeSizeDisplay" style="color:var(--slate);"></div>
+      </div>
+      <div class="field">
+        <label>Estimated pay</label>
+        <div class="field-value" id="payDisplay" style="font-weight:800; color:var(--navy); font-size:15px;"></div>
       </div>
     </div>
   </div>
@@ -1529,11 +1549,34 @@
     $('clientDisplay').textContent = current.client || '—';
     $('dateDisplay').textContent = current.date ? new Date(current.date + 'T00:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'}) : '—';
     $('addressDisplay').textContent = current.address || '—';
+
+    // Client contact info
+    const hasEmail = !!current.clientEmail;
+    const hasPhone = !!current.clientPhone;
+    if(hasEmail || hasPhone){
+      $('contactRow').style.display = '';
+      const emailWrap = $('emailFieldWrap'), phoneWrap = $('phoneFieldWrap');
+      if(hasEmail){ $('clientEmailDisplay').textContent = current.clientEmail; emailWrap.style.display=''; } else emailWrap.style.display='none';
+      if(hasPhone){ $('clientPhoneDisplay').textContent = current.clientPhone; phoneWrap.style.display=''; } else phoneWrap.style.display='none';
+    } else {
+      $('contactRow').style.display = 'none';
+    }
     if(current.notes){
       $('notesDisplay').textContent = current.notes;
       $('notesRow').style.display = '';
     } else {
       $('notesRow').style.display = 'none';
+    }
+
+    // Estimated pay + home size
+    const pe = getPayEstimate(current.serviceLevel, current.homeSize);
+    const sizePayRow = $('sizePayRow');
+    if(pe && pe.range && pe.range !== 'See pay schedule' && sizePayRow){
+      $('homeSizeDisplay').textContent = pe.sqFt ? pe.sqFt.toLocaleString() + ' sq ft · ' + pe.label : pe.label;
+      $('payDisplay').textContent = pe.range;
+      sizePayRow.style.display = '';
+    } else if(sizePayRow){
+      sizePayRow.style.display = 'none';
     }
 
     // Auto-open job details panel when job has assigned data

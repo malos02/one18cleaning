@@ -989,7 +989,7 @@
 
     // Estimated pay block — top of detail view
     if(j.assigned_to && d.serviceLevel && !d.payment){
-      const addonItems = d.sections && d.sections.addons && d.sections.addons.items ? d.sections.addons.items : {};
+      const addonItems = d.addons || (d.sections && d.sections.addons && d.sections.addons.items) || {};
       const payEst = getEstimatedPay(d.serviceLevel, d.homeSize, addonItems);
       const svcLabel = {standard:'Standard Clean', deep:'Deep Clean', move:'Move-In/Move-Out'}[d.serviceLevel]||d.serviceLevel;
       const payBlock = document.createElement('div');
@@ -1623,12 +1623,14 @@
                   ${d.notes ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Notes: </span>${escapeHtml(d.notes)}</div>` : ''}
                   ${(()=>{
                     if(!d.serviceLevel) return '';
-                    const addonItems = d.sections && d.sections.addons && d.sections.addons.items ? d.sections.addons.items : {};
+                    // Manual jobs store addons in d.addons; checklist jobs store in d.sections.addons.items
+                    const addonItems = d.addons || (d.sections && d.sections.addons && d.sections.addons.items) || {};
                     const pe = getEstimatedPay(d.serviceLevel, d.homeSize, addonItems);
                     return `<div style="margin-top:14px; background:#FFF8EE; border:1px solid #E8D9B5; border-radius:9px; padding:12px 14px;">
                       <div style="font-size:10px; font-weight:700; color:#9A7040; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Estimated Pay</div>
                       <div style="font-size:18px; font-weight:800; color:#16283F;">${pe.total}</div>
-                      <div style="font-size:11px; color:#6B7A8C;">${pe.label}${d.homeSize ? ' · ' + escapeHtml(d.homeSize) : ''}</div>
+                      <div style="font-size:11px; color:#6B7A8C;">${pe.label}${d.homeSize ? ' · ' + escapeHtml(String(d.homeSize)) : ''}</div>
+                      ${pe.addons && pe.addons.length ? `<div style="font-size:11px;color:#6B7A8C;margin-top:4px;">Includes: ${pe.addons.map(a=>a.label).join(', ')}</div>` : ''}
                     </div>`;
                   })()}
                   <div style="margin-top:16px;">
