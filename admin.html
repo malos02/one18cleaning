@@ -656,6 +656,13 @@
         ? `<div style="font-size:11px;font-weight:700;color:#1A6B9A;margin-top:2px;">💰 Paid $${parseFloat(d.payment.amount||0).toFixed(0)} · ${d.payment.date||''}</div>`
         : '';
 
+      // Contractor name — from lookup table first, then stored name, then email
+      const assignedEmail = j.assigned_to || d.assignedTo;
+      const assignedName = getContractorName(assignedEmail) || d.assignedName || assignedEmail || null;
+      const assignedLine = assignedName
+        ? `<div class="jm" style="font-weight:600; color:var(--navy);">Assigned to: ${escapeHtml(assignedName)}</div>`
+        : `<div class="jm" style="color:var(--slate); font-style:italic;">Unassigned</div>`;
+
       // Estimated payout for assigned jobs
       const payEst = (assignedName && !d.payment && d.serviceLevel)
         ? getEstimatedPay(d.serviceLevel, d.homeSize, d.sections && d.sections.addons && d.sections.addons.items)
@@ -663,13 +670,6 @@
       const payEstBadge = payEst
         ? `<div style="font-size:11px;color:#6B5B2E;margin-top:2px;">Est. pay: ${escapeHtml(payEst.total)}${payEst.sqFt ? ' · '+payEst.sqFt+' sq ft' : ''}</div>`
         : '';
-
-      // Contractor name — from lookup table first, then stored name, then email
-      const assignedEmail = j.assigned_to || d.assignedTo;
-      const assignedName = getContractorName(assignedEmail) || d.assignedName || assignedEmail || null;
-      const assignedLine = assignedName
-        ? `<div class="jm" style="font-weight:600; color:var(--navy);">Assigned to: ${escapeHtml(assignedName)}</div>`
-        : `<div class="jm" style="color:var(--slate); font-style:italic;">Unassigned</div>`;
 
       const statusLabel = isArchived ? 'Archived' : j.status === 'approved' ? 'Approved ✓' : j.status === 'submitted' ? 'Submitted' : 'In Progress';
 
