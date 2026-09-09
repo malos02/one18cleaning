@@ -512,8 +512,9 @@ function mapAddonItems(items){
 }
 
 async function syncFromFieldApp(){
+  // Sync both submitted and approved jobs — not just approved
   const [jobsRes, contractorsRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,assigned_to,approved_at,updated_at&status=eq.approved&order=updated_at.desc`, {headers: authHeaders()}),
+    fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,assigned_to,approved_at,updated_at&status=in.(approved,submitted)&order=updated_at.desc`, {headers: authHeaders()}),
     fetch(`${SUPABASE_URL}/rest/v1/contractors?select=name,email,phone&active=eq.true`, {headers: authHeaders()}),
   ]);
   if(!jobsRes.ok) throw new Error('Field app job fetch failed: '+jobsRes.status);
@@ -538,7 +539,7 @@ async function syncFromFieldApp(){
     const isPaid = !!d.payment;
     const range = getRange(getBand(homeSizeBand), serviceType);
     const basePayout = isPaid ? d.payment.amount : (range ? range.max : 0);
-    const addons = isPaid ? [] : mapAddonItems(d.sections && d.sections.addons && d.sections.addons.items);
+    const addons = isPaid ? [] : mapAddonItems(d.addons || (d.sections && d.sections.addons && d.sections.addons.items));
     const jobRef = d.name || d.client || ('SB-'+fj.id.slice(0,8));
     const serviceDate = (d.date || fj.approved_at || fj.updated_at).slice(0,10);
 
@@ -550,6 +551,7 @@ async function syncFromFieldApp(){
       tier:'standard', travelPremium:0, supplyAllowance:0, twoPerson:false, splitPct:50 };
 
     if(existing){
+      // Always re-sync to pick up payment updates
       await updateJobRow(existing.id, job);
       updated++;
     } else {
@@ -852,6 +854,20 @@ async function handleDeleteJob(id){
   catch(e){ toast(e.message || 'Could not delete job'); }
 }
 
+async function autoSync(){
+  try{
+    const res = await syncFromFieldApp();
+    await reloadAndRender();
+    // Show subtle indicator only if something changed
+    if(res.created > 0 || res.updated > 0){
+      const parts = [];
+      if(res.created > 0) parts.push(`${res.created} new`);
+      if(res.updated > 0) parts.push(`${res.updated} updated`);
+      toast(`Auto-synced — ${parts.join(', ')}`);
+    }
+  }catch(e){ console.error('Auto-sync failed:', e); }
+}
+
 $('syncBtn').onclick = async ()=>{
   $('syncBtn').disabled = true; $('syncBtn').textContent = 'Syncing…';
   try{
@@ -905,6 +921,12 @@ renderRateCard();
   if(s && (session=s) && isAdmin()){
     $('loginGate').classList.add('hidden');
     await reloadAndRender();
+    // Auto-sync from field app on load
+    await autoSync();
+    // Re-sync every 5 minutes while page is open
+    setInterval(()=>{ if(document.visibilityState==='visible') autoSync(); }, 5*60*1000);
+    // Re-sync when user switches back to this tab
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') autoSync(); });
   } else {
     if(s && !isAdmin()){ $('notAdminMsg').style.display='block'; clearSession(); }
     $('loginGate').classList.remove('hidden');
