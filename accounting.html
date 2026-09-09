@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One:18 Cleaning — Accounting Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#132441; --navy-2:#1c3355; --gold:#c9a24b; --gold-light:#e4c777;
+    --cream:#f6f2e8; --paper:#fffcf5; --ink:#20242b; --slate:#5c6470; --line:#e4ddca;
+    --success:#3f6f56; --success-bg:#e9f1eb; --warn:#a34a2f; --warn-bg:#fbeae3; --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--cream); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+  button{font-family:inherit; cursor:pointer;}
+
+  /* ---------- Login gate ---------- */
+  .login-gate{position:fixed; inset:0; background:var(--navy); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .login-gate.hidden{display:none;}
+  .login-card{background:var(--paper); width:100%; max-width:340px; border-radius:14px; padding:28px 24px; text-align:center;}
+  .login-seal{width:44px; height:44px; border-radius:50%; border:1.5px solid var(--gold); margin:0 auto 14px; display:flex; align-items:center; justify-content:center; color:var(--gold); font-family:'Fraunces',serif; font-size:18px;}
+  .login-card h2{font-size:19px; color:var(--navy); margin-bottom:4px;}
+  .login-sub{font-size:12.5px; color:var(--slate); margin:0 0 18px;}
+  .login-field{text-align:left; margin-bottom:12px;}
+  .login-field label{display:block; font-size:10.5px; color:var(--slate); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;}
+  .login-field input{width:100%; border:1.3px solid var(--line); border-radius:8px; padding:10px 11px; font-size:14px; outline:none; background:#fcfaf4; font-family:'Inter',sans-serif;}
+  .login-error{display:none; background:var(--warn-bg); color:var(--warn); font-size:12px; border-radius:8px; padding:8px 10px; margin-bottom:12px; text-align:left;}
+  .login-error.show{display:block;}
+  .login-btn{width:100%; background:var(--navy); color:#fff; border:none; border-radius:9px; padding:12px; font-size:14px; font-weight:700;}
+  .login-btn:disabled{opacity:0.6;}
+  .not-admin{color:var(--warn); font-size:12.5px; margin-top:10px;}
+
+  /* ---------- Masthead ---------- */
+  .masthead{background:var(--navy); color:var(--cream); display:flex; align-items:center; justify-content:space-between; padding:14px 24px; gap:12px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{width:34px; height:34px; border-radius:50%; border:1.5px solid var(--gold-light); display:flex; align-items:center; justify-content:center; font-family:'Fraunces',serif; font-weight:600; font-size:13px; color:var(--gold-light); flex-shrink:0;}
+  .brand-name{font-family:'Fraunces',serif; font-weight:600; font-size:15px;}
+  .brand-tag{font-size:10px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gold-light); margin-top:2px;}
+  .masthead-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .back-link{color:rgba(255,255,255,0.65); font-size:12px; text-decoration:none; display:flex; align-items:center; gap:4px;}
+  .back-link:hover{color:#fff;}
+  .btn{font-size:13px; font-weight:600; padding:9px 16px; border-radius:7px; border:none; display:inline-flex; align-items:center; gap:6px;}
+  .btn-gold{background:var(--gold); color:var(--navy);}
+  .btn-outline{background:transparent; color:var(--cream); border:1px solid rgba(255,255,255,0.3);}
+  .btn-primary{background:var(--navy); color:var(--gold-light); border:1px solid var(--gold);}
+  .btn-ghost{background:transparent; color:var(--slate); border:1px solid var(--line);}
+  .btn-danger{background:transparent; color:var(--warn); border:1px solid var(--warn);}
+
+  /* ---------- Main / tabs ---------- */
+  main{max-width:1060px; margin:0 auto; padding:24px 20px 80px;}
+  .tabs{display:flex; gap:20px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .tab-btn{background:none; border:none; padding:8px 2px 12px; font-size:13px; font-weight:600; color:var(--slate); border-bottom:2px solid transparent;}
+  .tab-btn.active{color:var(--navy); border-bottom-color:var(--gold);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .eyebrow{font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:4px;}
+  .section-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;}
+  .lede{color:var(--slate); font-size:13px; line-height:1.6; max-width:680px; margin:0 0 16px;}
+  select.range-select{border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; background:var(--paper);}
+
+  /* ---------- Stat cards ---------- */
+  .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px;}
+  @media (max-width:860px){ .stat-grid{grid-template-columns:repeat(2,1fr);} }
+  .stat-card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:0 1px 2px rgba(19,36,65,.06);}
+  .stat-card.accent{border-color:color-mix(in srgb, var(--gold) 40%, var(--line));}
+  .stat-label{font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--slate); font-weight:600; margin-bottom:8px;}
+  .stat-value{font-family:'IBM Plex Mono',monospace; font-size:21px; font-weight:600; color:var(--navy);}
+  .stat-sub{margin-top:8px; font-size:11.5px; color:var(--slate);}
+  .badge{display:inline-flex; align-items:center; border-radius:20px; padding:2px 9px; font-size:11px; font-weight:600;}
+  .badge-warn{background:var(--warn-bg); color:var(--warn);}
+  .badge-ok{background:var(--success-bg); color:var(--success);}
+  .badge-outline{background:transparent; border:1px solid var(--line); color:var(--slate);}
+  .svc-row{display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; border-bottom:1px dashed var(--line);}
+  .svc-row:last-child{border-bottom:none;}
+
+  /* ---------- Card / table ---------- */
+  .card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:16px; box-shadow:0 1px 2px rgba(19,36,65,.06);}
+  .card h3{font-size:14.5px; margin-bottom:12px;}
+  .table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper);}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:9px 12px; text-align:left; border-bottom:1px dashed var(--line); white-space:nowrap;}
+  thead th{background:var(--navy); color:var(--gold-light); font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:none;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:color-mix(in srgb, var(--gold) 6%, transparent);}
+  .num{text-align:right;}
+  .margin-low{color:var(--warn); font-weight:600;}
+  .margin-ok{color:var(--success); font-weight:600;}
+  .empty-state{text-align:center; padding:36px 16px; color:var(--slate); font-size:12.5px;}
+  .icon-btn{background:transparent; border:1px solid var(--line); border-radius:6px; padding:4px 6px; color:var(--slate); font-size:12px; margin-right:4px;}
+  .icon-btn:hover{color:var(--navy); border-color:var(--gold);}
+  .filter-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;}
+  .filter-row input, .filter-row select{border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; background:var(--paper);}
+  .filter-row input{flex:1; min-width:200px;}
+  .rank-cell{width:26px; text-align:center; font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- Chart ---------- */
+  .chart-wrap{width:100%; overflow-x:auto;}
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{position:fixed; inset:0; background:rgba(19,36,65,0.55); z-index:200; display:none; align-items:flex-start; justify-content:center; padding:26px 16px; overflow-y:auto;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--paper); width:100%; max-width:760px; border-radius:12px; padding:22px 24px 20px; margin-top:10px;}
+  .modal h2{font-size:18px; margin-bottom:4px;}
+  .modal-sub{font-size:12.5px; color:var(--slate); margin-bottom:16px;}
+  .modal-grid{display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; align-items:start;}
+  @media (max-width:680px){ .modal-grid{grid-template-columns:1fr;} }
+  .field-row{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+  .field{flex:1; min-width:130px; display:flex; flex-direction:column; gap:4px; margin-bottom:12px;}
+  .field label{font-size:10.5px; font-weight:600; color:var(--slate); text-transform:uppercase; letter-spacing:0.03em;}
+  .field .hint-inline{font-weight:400; text-transform:none; letter-spacing:0; color:var(--slate);}
+  input[type=text], input[type=number], input[type=date], select, textarea{
+    font-family:'Inter',sans-serif; font-size:13.5px; padding:8px 10px; border:1px solid var(--line);
+    border-radius:7px; background:#fff; color:var(--ink); width:100%;
+  }
+  .addon-list{border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .addon-row{display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px dashed var(--line); font-size:13px;}
+  .addon-row:last-child{border-bottom:none;}
+  .addon-row.disabled{opacity:0.45;}
+  .addon-row input[type=checkbox]{width:16px; height:16px;}
+  .addon-row .addon-label{flex:1;}
+  .tier-group{display:flex; gap:8px;}
+  .tier-btn{flex:1; text-align:left; background:#fff; border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:12.5px; font-weight:600;}
+  .tier-btn span{display:block; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:500; color:var(--slate);}
+  .tier-btn.active{background:var(--navy); border-color:var(--navy); color:var(--gold-light);}
+  .tier-btn.active span{color:var(--gold-light);}
+  .switch-row{display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:10px;}
+  .stub{background:var(--paper); border:1px solid var(--line); border-radius:10px; box-shadow:0 6px 16px -8px rgba(19,36,65,.22);}
+  .stub-top{background:var(--navy); color:var(--gold-light); padding:12px 16px; font-weight:600; font-size:13.5px; border-radius:10px 10px 0 0;}
+  .stub-body{padding:14px 16px; font-size:12.5px;}
+  .stub-row{display:flex; justify-content:space-between; padding:4px 0;}
+  .stub-divider{border-top:1px dashed var(--line); margin:8px 0;}
+  .stub-total{font-weight:700; font-size:14.5px; color:var(--navy); border-top:1px solid var(--ink); padding-top:8px; margin-top:4px;}
+  .stub-flag{margin:0 16px 14px; font-size:11.5px; padding:8px 10px; border-radius:7px;}
+  .modal-footer{display:flex; justify-content:flex-end; gap:10px; margin-top:18px;}
+  .close-x{position:absolute; top:16px; right:18px; background:none; border:none; font-size:18px; color:var(--slate);}
+  .modal{position:relative;}
+</style>
+</head>
+<body>
+
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="login-seal">✦</div>
+    <h2>One:18 Accounting</h2>
+    <p class="login-sub">Sign in with your admin account</p>
+    <div class="login-field"><label>Email</label><input type="text" id="loginEmail" autocomplete="username" placeholder="you@example.com"></div>
+    <div class="login-field"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-btn" id="loginBtn">Log In</button>
+    <div class="not-admin" id="notAdminMsg" style="display:none;">This account isn't set up for admin access.</div>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="brand">
+    <div class="brand-mark">✦</div>
+    <div>
+      <div class="brand-name">One:18</div>
+      <div class="brand-tag">Cleaning with Purpose · Accounting</div>
+    </div>
+  </div>
+  <div class="masthead-actions">
+    <a href="admin.html" class="back-link">← Admin Dashboard</a>
+    <button class="btn btn-outline" id="logoutBtn">Log out</button>
+    <button class="btn btn-gold" id="newJobBtn">+ New job</button>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="jobs">Jobs</button>
+    <button class="tab-btn" data-tab="rateCard">Rate card</button>
+    <button class="tab-btn" data-tab="contractors">Contractors</button>
+  </div>
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <section class="panel active" id="panel-overview">
+    <div class="section-head">
+      <div><div class="eyebrow">Dashboard</div><h1>Books at a glance</h1></div>
+      <select class="range-select" id="rangeSelect">
+        <option value="month" selected>This month</option>
+        <option value="30d">Last 30 days</option>
+        <option value="quarter">This quarter</option>
+        <option value="all">All time</option>
+      </select>
+    </div>
+    <div id="overviewStats"></div>
+    <div class="card">
+      <h3>Revenue vs. contractor payout</h3>
+      <div class="chart-wrap" id="trendChart"></div>
+    </div>
+  </section>
+
+  <!-- ===================== JOBS ===================== -->
+  <section class="panel" id="panel-jobs">
+    <div class="section-head">
+      <div><div class="eyebrow">Job history</div><h1>Every job, priced and logged</h1></div>
+      <button class="btn btn-ghost" id="syncBtn">⟳ Sync from field app</button>
+    </div>
+    <p class="lede">Pulls approved jobs from the <span class="mono">jobs</span> / <span class="mono">contractors</span> tables in this same Supabase project. New syncs default to a $0 client price — open a job and enter what the client was charged to see its margin.</p>
+    <div class="filter-row">
+      <input type="text" id="searchInput" placeholder="Search job # or contractor">
+      <select id="serviceFilter">
+        <option value="all">All services</option>
+        <option value="standard">Standard Recurring</option>
+        <option value="deep_clean">Deep Clean</option>
+        <option value="move_in_out">Move-In / Move-Out</option>
+      </select>
+      <select id="contractorFilter"><option value="all">All contractors</option></select>
+    </div>
+    <div class="table-wrap"><table id="jobsTable">
+      <thead><tr>
+        <th>Date</th><th>Job #</th><th>Contractor</th><th>Service</th><th>Size</th>
+        <th class="num">Client price</th><th class="num">Payout</th><th class="num">Margin</th><th></th>
+      </tr></thead>
+      <tbody id="jobsTbody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================== RATE CARD ===================== -->
+  <section class="panel" id="panel-rateCard">
+    <div class="section-head"><div><div class="eyebrow">Official pay guide</div><h1>Contractor payout rate card</h1></div></div>
+    <p class="lede">Deep Clean pay includes baseboards, interior windows/sills, blinds, accessible fans/fixtures, detailed bathrooms and floors. Move-In/Move-Out pay includes everything in Deep Clean plus cabinet interiors, closets, refrigerator interior, oven interior and vacant-space detailing — so those add-ons don't apply again on top.</p>
+    <div class="card">
+      <h3>Core cleaning services</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Home size</th><th class="num">Standard recurring</th><th class="num">Deep clean</th><th class="num">Move-in / move-out</th></tr></thead>
+        <tbody id="rateCoreTbody"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>Square-footage add-on compensation</h3>
+      <div class="table-wrap"><table>
+        <thead><tr id="rateAddonHead"><th>Add-on</th></tr></thead>
+        <tbody id="rateAddonTbody"></tbody>
+      </table></div>
+      <p style="font-size:11.5px;color:var(--slate);margin-top:12px;">Refrigerator or oven interior may get a specialty flat fee when separately booked. All amounts are total contractor compensation, not a guaranteed hourly rate.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CONTRACTORS ===================== -->
+  <section class="panel" id="panel-contractors">
+    <div class="section-head"><div><div class="eyebrow">Team</div><h1>Contractor leaderboard</h1></div></div>
+    <p class="lede">Ranked by total contractor payout across all logged jobs, manual and synced.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>Contractor</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Total payout</th><th class="num">Margin</th></tr></thead>
+      <tbody id="contractorsTbody"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<!-- ===================== NEW / EDIT JOB MODAL ===================== -->
+<div class="modal-overlay" id="jobModalOverlay">
+  <div class="modal">
+    <button class="close-x" id="jobModalClose">✕</button>
+    <h2 id="jobModalTitle">New job</h2>
+    <p class="modal-sub">Price the job against the rate card and log the contractor payout.</p>
+    <div class="modal-grid">
+      <div>
+        <div class="field-row">
+          <div class="field"><label>Job / reference #</label><input type="text" id="fJobRef" placeholder="auto-generated"></div>
+          <div class="field"><label>Service date</label><input type="date" id="fServiceDate"></div>
+        </div>
+        <div class="field"><label>Contractor</label><input type="text" id="fContractor" placeholder="Contractor name"></div>
+        <div class="field-row">
+          <div class="field"><label>Home size</label><select id="fHomeSize"></select></div>
+          <div class="field"><label>Service type</label><select id="fServiceType"></select></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Client price ($)</label><input type="number" id="fClientPrice" min="0" step="1"></div>
+          <div class="field"><label id="fBasePayoutLabel">Base contractor payout ($)</label><input type="number" id="fBasePayout" min="0" step="1"></div>
+        </div>
+        <div class="field">
+          <label>Add-ons (not already included in this service)</label>
+          <div class="addon-list" id="fAddonList"></div>
+        </div>
+        <div class="field">
+          <label>Contractor tier</label>
+          <div class="tier-group" id="fTierGroup"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Travel premium ($)</label><input type="number" id="fTravel" min="0" step="1" value="0"></div>
+          <div class="field"><label>Supply allowance ($)</label><input type="number" id="fSupply" min="0" step="1" value="0"></div>
+        </div>
+        <div class="switch-row"><input type="checkbox" id="fTwoPerson"> <span>Two-person team — split this payout</span></div>
+        <div class="field" id="fSplitField" style="display:none;"><label>Contractor A share (%)</label><input type="number" id="fSplitPct" min="0" max="100" step="5" value="50"></div>
+      </div>
+      <div class="stub">
+        <div class="stub-top">Payout stub</div>
+        <div class="stub-body" id="stubBody"></div>
+        <div class="stub-flag" id="stubFlag"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="jobModalCancel">Cancel</button>
+      <button class="btn btn-primary" id="jobModalSave">Save job</button>
+    </div>
+  </div>
+</div>
+
+<div style="position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:300; pointer-events:none;">
+  <div id="toast" style="background:var(--navy); color:#fff; padding:9px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .25s ease;"></div>
+</div>
+
+<script>
+(function(){
+
+/* =========================================================================
+   CONFIG — fill these in with your Supabase project's values (Project
+   Settings → API). This is the SAME project the contractor field app
+   (admin.html) already uses — this dashboard reads its `jobs` and
+   `contractors` tables directly and writes its own `accounting_jobs` rows
+   (see schema.sql).
+   ========================================================================= */
+const SUPABASE_URL = 'https://qbicdeyirtvavlkrarcy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_pvN11J0EDjEVsuCvXHVung_3Eh2VjVj';
+const ADMIN_EMAILS = ['one18cleaning@gmail.com'];
+const SESSION_KEY = 'one18_accounting_session';
+
+const $ = id => document.getElementById(id);
+let session = null;
+
+function toast(msg){
+  const el = $('toast');
+  el.textContent = msg; el.style.opacity = '1';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>{ el.style.opacity = '0'; }, 2200);
+}
+
+/* ---------------- Auth (same pattern as admin.html) ---------------- */
+function authHeaders(){
+  return { apikey: SUPABASE_KEY, Authorization: `Bearer ${session ? session.access_token : SUPABASE_KEY}`, 'Content-Type':'application/json' };
+}
+function saveSession(s){ session = s; try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+function clearSession(){ session = null; try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
+function loadStoredSession(){ try{ const r = localStorage.getItem(SESSION_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+function sessionFromAuthResponse(body, fallbackEmail){
+  return { access_token: body.access_token, refresh_token: body.refresh_token, expires_at: Date.now() + body.expires_in*1000, email: (body.user && body.user.email) || fallbackEmail };
+}
+async function signIn(email, password){
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method:'POST', headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'}, body: JSON.stringify({email,password})
+  });
+  const body = await res.json();
+  if(!res.ok) throw new Error(body.error_description || body.msg || 'Login failed');
+  const s = sessionFromAuthResponse(body, email);
+  saveSession(s);
+  return s;
+}
+async function refreshSession(s){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method:'POST', headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'}, body: JSON.stringify({refresh_token:s.refresh_token})
+    });
+    if(!res.ok) return null;
+    const body = await res.json();
+    const ns = sessionFromAuthResponse(body, s.email);
+    saveSession(ns);
+    return ns;
+  }catch(e){ return null; }
+}
+async function ensureSession(){
+  let s = loadStoredSession();
+  if(!s) return null;
+  if(s.expires_at - Date.now() < 60000){ s = await refreshSession(s); }
+  if(s) session = s;
+  return s;
+}
+function isAdmin(){ return session && ADMIN_EMAILS.includes((session.email||'').toLowerCase()); }
+
+/* =========================================================================
+   RATE CARD — mirrors the official Pay Guide (same tables the field app
+   and Floot version both use).
+   ========================================================================= */
+const HOME_SIZE_BANDS = [
+  { id:'under_1200', label:'Under 1,200 sq. ft.', shortLabel:'<1,200', standard:[60,70], deepClean:[125,145], moveInOut:[145,165],
+    addonRates:{windows:25,baseboards:20,blinds:15,fans:15,cabinets:25,petHair:15,garage:20,patio:15} },
+  { id:'size_1200_2000', label:'1,200–2,000 sq. ft.', shortLabel:'1,200–2,000', standard:[70,90], deepClean:[145,190], moveInOut:[165,215],
+    addonRates:{windows:35,baseboards:30,blinds:25,fans:20,cabinets:35,petHair:20,garage:25,patio:20} },
+  { id:'size_2001_3000', label:'2,001–3,000 sq. ft.', shortLabel:'2,001–3,000', standard:[90,115], deepClean:[190,250], moveInOut:[215,275],
+    addonRates:{windows:50,baseboards:40,blinds:35,fans:25,cabinets:50,petHair:30,garage:30,patio:25} },
+  { id:'size_3001_4000', label:'3,001–4,000 sq. ft.', shortLabel:'3,001–4,000', standard:[115,145], deepClean:[250,320], moveInOut:[275,345],
+    addonRates:{windows:65,baseboards:50,blinds:45,fans:35,cabinets:60,petHair:40,garage:40,patio:35} },
+  { id:'size_4001_5000', label:'4,001–5,000 sq. ft.', shortLabel:'4,001–5,000', standard:[145,180], deepClean:[320,390], moveInOut:[345,415],
+    addonRates:{windows:85,baseboards:65,blinds:55,fans:45,cabinets:75,petHair:50,garage:50,patio:45} },
+  { id:'over_5000', label:'5,000+ sq. ft.', shortLabel:'5,000+', standard:null, deepClean:null, moveInOut:null, addonRates:null },
+];
+const SERVICE_TYPES = [
+  { id:'standard', label:'Standard Recurring' },
+  { id:'deep_clean', label:'Deep Clean' },
+  { id:'move_in_out', label:'Move-In / Move-Out' },
+];
+const TIERS = [ {id:'standard',label:'Standard',pct:0}, {id:'preferred',label:'Preferred',pct:3}, {id:'elite',label:'Elite',pct:5} ];
+const ADDON_DEFS = [
+  { id:'windows', label:'Interior Windows' }, { id:'baseboards', label:'Baseboards' },
+  { id:'blinds', label:'Blinds' }, { id:'fans', label:'Fans / Fixtures' },
+  { id:'cabinets', label:'Cabinet Interiors' }, { id:'petHair', label:'Extensive Pet Hair' },
+  { id:'garage', label:'Garage Basic Clean' }, { id:'patio', label:'Patio / Porch Basic Clean' },
+];
+const INCLUDED_ADDONS = {
+  standard: [],
+  deep_clean: ['windows','baseboards','blinds','fans'],
+  move_in_out: ['windows','baseboards','blinds','fans','cabinets'],
+};
+const MINIMUM_MARGIN = 50;
+
+function getBand(id){ return HOME_SIZE_BANDS.find(b=>b.id===id); }
+function getRange(band, serviceType){
+  const r = serviceType==='standard' ? band.standard : serviceType==='deep_clean' ? band.deepClean : band.moveInOut;
+  return r ? {min:r[0], max:r[1]} : null;
+}
+function isAddonAvailable(serviceType, addonId){ return !INCLUDED_ADDONS[serviceType].includes(addonId); }
+function midpoint(range){ return range ? Math.round((range.min+range.max)/2) : 0; }
+function fmt(n){ return (n||0).toLocaleString(undefined,{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function computeJobPayout(input){
+  const band = getBand(input.homeSizeBand);
+  const addonRates = band.addonRates;
+  const addonLines = (input.addons||[]).filter(a=>a.qty>0 && isAddonAvailable(input.serviceType, a.id)).map(a=>{
+    const def = ADDON_DEFS.find(d=>d.id===a.id);
+    const rate = addonRates ? addonRates[a.id] : 0;
+    return { id:a.id, label:def.label, qty:a.qty, rate, amount:rate*a.qty };
+  });
+  const addonsPayout = addonLines.reduce((s,l)=>s+l.amount,0);
+  const tierPct = (TIERS.find(t=>t.id===input.tier)||{pct:0}).pct;
+  const tierAmount = Math.round((input.basePayout+addonsPayout)*tierPct/100*100)/100;
+  const totalPayout = Math.round((input.basePayout+addonsPayout+tierAmount+input.travelPremium+input.supplyAllowance)*100)/100;
+  const margin = Math.round((input.clientPrice - totalPayout)*100)/100;
+  const splitPct = input.twoPerson ? input.splitPct : 100;
+  const splitAmountA = Math.round((totalPayout*splitPct/100)*100)/100;
+  const splitAmountB = Math.round((totalPayout-splitAmountA)*100)/100;
+  return { basePayout:input.basePayout, addonLines, addonsPayout, tierPct, tierAmount,
+    travelPremium:input.travelPremium, supplyAllowance:input.supplyAllowance, totalPayout, margin,
+    belowMinimumMargin: margin < MINIMUM_MARGIN, splitAmountA, splitAmountB };
+}
+
+/* =========================================================================
+   DATA — accounting_jobs table (this dashboard's own records)
+   ========================================================================= */
+let allJobs = [];
+
+async function fetchJobs(){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_jobs?select=*&order=service_date.desc`, { headers: authHeaders() });
+  if(!res.ok) throw new Error('Failed to load jobs: '+res.status);
+  const rows = await res.json();
+  return rows.map(rowToJob);
+}
+function rowToJob(r){
+  return {
+    id:r.id, jobRef:r.job_ref, serviceDate:r.service_date, contractorName:r.contractor_name,
+    homeSizeBand:r.home_size_band, serviceType:r.service_type, clientPrice:Number(r.client_price),
+    basePayout:Number(r.base_payout), addons:r.addons||[], tier:r.tier,
+    travelPremium:Number(r.travel_premium), supplyAllowance:Number(r.supply_allowance),
+    twoPerson:r.two_person, splitPct:Number(r.split_pct), source:r.source, externalId:r.external_id,
+  };
+}
+function jobToRow(j){
+  const r = computeJobPayout(j);
+  return {
+    job_ref:j.jobRef, service_date:j.serviceDate, contractor_name:j.contractorName,
+    home_size_band:j.homeSizeBand, service_type:j.serviceType, client_price:j.clientPrice,
+    base_payout:j.basePayout, addons:j.addons, tier:j.tier, travel_premium:j.travelPremium,
+    supply_allowance:j.supplyAllowance, two_person:j.twoPerson, split_pct:j.splitPct,
+    addons_payout:r.addonsPayout, tier_amount:r.tierAmount, total_payout:r.totalPayout, margin:r.margin,
+  };
+}
+async function createJobRow(job){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_jobs`, {
+    method:'POST', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify(jobToRow(job)),
+  });
+  if(!res.ok) throw new Error('Failed to save job: '+res.status);
+}
+async function updateJobRow(id, job){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_jobs?id=eq.${encodeURIComponent(id)}`, {
+    method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify(jobToRow(job)),
+  });
+  if(!res.ok) throw new Error('Failed to update job: '+res.status);
+}
+async function deleteJobRow(id){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_jobs?id=eq.${encodeURIComponent(id)}`, {
+    method:'DELETE', headers: authHeaders(),
+  });
+  if(!res.ok) throw new Error('Failed to delete job: '+res.status);
+}
+
+/* ---------------- Sync from the field app's jobs/contractors tables ---------------- */
+function parseHomeSizeSqFt(homeSize){
+  if(!homeSize) return null;
+  const m = String(homeSize).replace(/,/g,'').match(/(\d+)/);
+  return m ? parseInt(m[1]) : null;
+}
+function mapSqFtToBand(sqFt){
+  if(sqFt==null) return 'size_1200_2000';
+  if(sqFt<=1200) return 'under_1200';
+  if(sqFt<=2000) return 'size_1200_2000';
+  if(sqFt<=3000) return 'size_2001_3000';
+  if(sqFt<=4000) return 'size_3001_4000';
+  if(sqFt<=5000) return 'size_4001_5000';
+  return 'over_5000';
+}
+function mapServiceLevel(level){ return level==='deep' ? 'deep_clean' : level==='move' ? 'move_in_out' : 'standard'; }
+const ADDON_KEY_MAP = { windows:'windows', baseboards:'baseboards', blinds:'blinds', fans:'fans', cabinets:'cabinets', pethair:'petHair', garage:'garage', patio:'patio' };
+function mapAddonItems(items){
+  if(!items) return [];
+  return Object.entries(items).filter(([k,v])=>v && ADDON_KEY_MAP[k]).map(([k])=>({id:ADDON_KEY_MAP[k], qty:1}));
+}
+
+async function syncFromFieldApp(){
+  const [jobsRes, contractorsRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/jobs?select=id,data,status,assigned_to,approved_at,updated_at&status=eq.approved&order=updated_at.desc`, {headers: authHeaders()}),
+    fetch(`${SUPABASE_URL}/rest/v1/contractors?select=name,email,phone&active=eq.true`, {headers: authHeaders()}),
+  ]);
+  if(!jobsRes.ok) throw new Error('Field app job fetch failed: '+jobsRes.status);
+  if(!contractorsRes.ok) throw new Error('Field app contractor fetch failed: '+contractorsRes.status);
+  const fieldJobs = await jobsRes.json();
+  const contractors = await contractorsRes.json();
+  const nameByEmail = new Map(contractors.map(c=>[c.email.toLowerCase(), c.name]));
+
+  const existingByExternalId = new Map(allJobs.filter(j=>j.externalId).map(j=>[j.externalId, j]));
+
+  let created=0, updated=0, needsPrice=0, skippedUnassigned=0;
+
+  for(const fj of fieldJobs){
+    const d = fj.data;
+    if(!d) continue;
+    const email = fj.assigned_to || d.assignedTo || null;
+    const contractorName = (email && nameByEmail.get(email.toLowerCase())) || d.assignedName || email || 'Unassigned';
+    if(contractorName === 'Unassigned'){ skippedUnassigned++; continue; }
+
+    const homeSizeBand = mapSqFtToBand(parseHomeSizeSqFt(d.homeSize));
+    const serviceType = mapServiceLevel(d.serviceLevel);
+    const isPaid = !!d.payment;
+    const range = getRange(getBand(homeSizeBand), serviceType);
+    const basePayout = isPaid ? d.payment.amount : (range ? range.max : 0);
+    const addons = isPaid ? [] : mapAddonItems(d.sections && d.sections.addons && d.sections.addons.items);
+    const jobRef = d.name || d.client || ('SB-'+fj.id.slice(0,8));
+    const serviceDate = (d.date || fj.approved_at || fj.updated_at).slice(0,10);
+
+    const existing = existingByExternalId.get(fj.id);
+    const clientPrice = existing ? existing.clientPrice : 0;
+    if(clientPrice <= 0) needsPrice++;
+
+    const job = { jobRef, serviceDate, contractorName, homeSizeBand, serviceType, clientPrice, basePayout, addons,
+      tier:'standard', travelPremium:0, supplyAllowance:0, twoPerson:false, splitPct:50 };
+
+    if(existing){
+      await updateJobRow(existing.id, job);
+      updated++;
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/accounting_jobs`, {
+        method:'POST', headers:{...authHeaders(),'Prefer':'return=minimal'},
+        body: JSON.stringify({ ...jobToRow(job), source:'field_app', external_id: fj.id, synced_at: new Date().toISOString() }),
+      });
+      created++;
+    }
+  }
+  return { created, updated, needsPrice, skippedUnassigned };
+}
+
+/* =========================================================================
+   UI — tabs, overview, jobs table, rate card, contractors, job modal
+   ========================================================================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    $('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function isWithinRange(dateStr, range, now){
+  const d = new Date(dateStr+'T00:00:00');
+  if(range==='all') return true;
+  if(range==='30d'){ const c=new Date(now); c.setDate(c.getDate()-30); return d>=c; }
+  if(range==='month') return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  const q = Math.floor(now.getMonth()/3), dq = Math.floor(d.getMonth()/3);
+  return d.getFullYear()===now.getFullYear() && dq===q;
+}
+
+function renderOverview(){
+  const range = $('rangeSelect').value;
+  const now = new Date();
+  const ranged = allJobs.filter(j=>isWithinRange(j.serviceDate, range, now));
+
+  let revenue=0, payout=0, margin=0, belowMin=0;
+  const byService = { standard:0, deep_clean:0, move_in_out:0 };
+  const byMonth = {};
+  ranged.forEach(j=>{
+    const r = computeJobPayout(j);
+    revenue += j.clientPrice; payout += r.totalPayout; margin += r.margin;
+    if(r.belowMinimumMargin) belowMin++;
+    byService[j.serviceType]++;
+    const mk = j.serviceDate.slice(0,7);
+    if(!byMonth[mk]) byMonth[mk] = {revenue:0, payout:0};
+    byMonth[mk].revenue += j.clientPrice; byMonth[mk].payout += r.totalPayout;
+  });
+  const trend = Object.entries(byMonth).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>({
+    name: new Date(k+'-02').toLocaleDateString(undefined,{month:'short'}), revenue: Math.round(v.revenue), payout: Math.round(v.payout),
+  }));
+
+  $('overviewStats').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value mono">${fmt(revenue)}</div><div class="stat-sub">${ranged.length} job${ranged.length===1?'':'s'}</div></div>
+      <div class="stat-card"><div class="stat-label">Contractor payouts</div><div class="stat-value mono">${fmt(payout)}</div><div class="stat-sub">total compensation paid</div></div>
+      <div class="stat-card accent"><div class="stat-label">Gross margin</div><div class="stat-value mono">${fmt(margin)}</div>
+        <div class="stat-sub">${belowMin>0 ? `<span class="badge badge-warn">${belowMin} below $${MINIMUM_MARGIN} guardrail</span>` : `<span class="badge badge-ok">all jobs meet guardrail</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">By service type</div>
+        ${SERVICE_TYPES.map(s=>`<div class="svc-row"><span>${s.label}</span><span class="mono">${byService[s.id]}</span></div>`).join('')}
+      </div>
+    </div>`;
+
+  const chartEl = $('trendChart');
+  if(trend.length===0){ chartEl.innerHTML = `<div class="empty-state">No jobs in this range yet.</div>`; return; }
+  const max = Math.max(1, ...trend.map(t=>Math.max(t.revenue,t.payout)));
+  const barW=34, gap=14, groupW=barW*2+6, chartH=180;
+  const svgW = trend.length*(groupW+gap);
+  let bars='';
+  trend.forEach((t,i)=>{
+    const x = i*(groupW+gap);
+    const hRev = Math.round((t.revenue/max)*chartH), hPay = Math.round((t.payout/max)*chartH);
+    bars += `<rect x="${x}" y="${chartH-hRev}" width="${barW}" height="${hRev}" fill="var(--gold)" rx="2"/>`;
+    bars += `<rect x="${x+barW+6}" y="${chartH-hPay}" width="${barW}" height="${hPay}" fill="var(--navy)" rx="2"/>`;
+    bars += `<text x="${x+groupW/2-3}" y="${chartH+18}" font-size="11" fill="var(--slate)" text-anchor="middle" font-family="Inter">${t.name}</text>`;
+  });
+  chartEl.innerHTML = `
+    <svg width="${Math.max(svgW,300)}" height="${chartH+30}" style="overflow:visible;">${bars}</svg>
+    <div style="display:flex; gap:16px; margin-top:8px; font-size:11.5px; color:var(--slate);">
+      <span><span style="display:inline-block;width:9px;height:9px;background:var(--gold);border-radius:2px;margin-right:5px;"></span>Revenue</span>
+      <span><span style="display:inline-block;width:9px;height:9px;background:var(--navy);border-radius:2px;margin-right:5px;"></span>Contractor payout</span>
+    </div>`;
+}
+
+function renderContractorFilterOptions(){
+  const names = Array.from(new Set(allJobs.map(j=>j.contractorName))).sort();
+  const sel = $('contractorFilter');
+  const current = sel.value;
+  sel.innerHTML = `<option value="all">All contractors</option>` + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  sel.value = names.includes(current) ? current : 'all';
+}
+
+function renderJobsTable(){
+  const q = $('searchInput').value.trim().toLowerCase();
+  const svc = $('serviceFilter').value;
+  const ctr = $('contractorFilter').value;
+  const rows = allJobs
+    .filter(j=> svc==='all' || j.serviceType===svc)
+    .filter(j=> ctr==='all' || j.contractorName===ctr)
+    .filter(j=> !q || j.jobRef.toLowerCase().includes(q) || j.contractorName.toLowerCase().includes(q))
+    .sort((a,b)=> b.serviceDate.localeCompare(a.serviceDate));
+
+  if(rows.length===0){
+    $('jobsTbody').innerHTML = `<tr><td colspan="9" class="empty-state">No jobs match these filters.</td></tr>`;
+    return;
+  }
+  $('jobsTbody').innerHTML = rows.map(j=>{
+    const r = computeJobPayout(j);
+    const svcLabel = (SERVICE_TYPES.find(s=>s.id===j.serviceType)||{}).label || j.serviceType;
+    const sizeLabel = getBand(j.homeSizeBand).shortLabel;
+    const sourceBadge = j.source==='field_app' ? ` <span class="badge badge-outline">Field app</span>` : '';
+    const priceCell = j.clientPrice>0 ? fmt(j.clientPrice) : `<span class="badge badge-warn">needs price</span>`;
+    return `<tr data-id="${j.id}">
+      <td>${new Date(j.serviceDate+'T00:00:00').toLocaleDateString()}</td>
+      <td class="mono">${escapeHtml(j.jobRef)}${sourceBadge}</td>
+      <td>${escapeHtml(j.contractorName)}</td>
+      <td>${svcLabel}</td>
+      <td>${sizeLabel}</td>
+      <td class="num mono">${priceCell}</td>
+      <td class="num mono">${fmt(r.totalPayout)}</td>
+      <td class="num mono ${r.belowMinimumMargin?'margin-low':'margin-ok'}">${fmt(r.margin)}</td>
+      <td style="text-align:right;">
+        <button class="icon-btn edit-job" data-id="${j.id}">✎</button>
+        <button class="icon-btn del-job" data-id="${j.id}">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('.edit-job').forEach(b=> b.onclick = ()=> openJobModal(allJobs.find(j=>String(j.id)===b.dataset.id)));
+  document.querySelectorAll('.del-job').forEach(b=> b.onclick = ()=> handleDeleteJob(b.dataset.id));
+}
+
+function renderContractors(){
+  const map = {};
+  allJobs.forEach(j=>{
+    const r = computeJobPayout(j);
+    if(!map[j.contractorName]) map[j.contractorName] = {jobs:0, payout:0, revenue:0, margin:0};
+    map[j.contractorName].jobs++; map[j.contractorName].payout += r.totalPayout;
+    map[j.contractorName].revenue += j.clientPrice; map[j.contractorName].margin += r.margin;
+  });
+  const rows = Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>b.payout-a.payout);
+  if(rows.length===0){ $('contractorsTbody').innerHTML = `<tr><td colspan="6" class="empty-state">No contractors logged yet — add a job to get started.</td></tr>`; return; }
+  $('contractorsTbody').innerHTML = rows.map((c,i)=>`
+    <tr><td class="rank-cell">${i===0?'🏆':i+1}</td><td>${escapeHtml(c.name)}</td>
+      <td class="num mono">${c.jobs}</td><td class="num mono">${fmt(c.revenue)}</td>
+      <td class="num mono">${fmt(c.payout)}</td><td class="num mono">${fmt(c.margin)}</td></tr>`).join('');
+}
+
+function renderRateCard(){
+  $('rateCoreTbody').innerHTML = HOME_SIZE_BANDS.map(b=>`
+    <tr><td>${b.label}</td>
+      <td class="num mono">${b.standard?`$${b.standard[0]}–$${b.standard[1]}`:'Custom'}</td>
+      <td class="num mono">${b.deepClean?`$${b.deepClean[0]}–$${b.deepClean[1]}`:'Custom'}</td>
+      <td class="num mono">${b.moveInOut?`$${b.moveInOut[0]}–$${b.moveInOut[1]}`:'Custom'}</td></tr>`).join('');
+  const bands5 = HOME_SIZE_BANDS.slice(0,5);
+  $('rateAddonHead').innerHTML = '<th>Add-on</th>' + bands5.map(b=>`<th class="num">${b.shortLabel}</th>`).join('');
+  $('rateAddonTbody').innerHTML = ADDON_DEFS.map(a=>`
+    <tr><td>${a.label}</td>${bands5.map(b=>`<td class="num mono">$${b.addonRates[a.id]}</td>`).join('')}</tr>`).join('');
+}
+
+/* ---------------- Job modal ---------------- */
+let editingId = null;
+let form = null;
+let basePayoutTouched = false;
+
+function defaultForm(){
+  return { jobRef:'', serviceDate:new Date().toISOString().slice(0,10), contractorName:'',
+    homeSizeBand:'size_1200_2000', serviceType:'standard', clientPrice:0,
+    basePayout: midpoint(getRange(getBand('size_1200_2000'),'standard')),
+    addons:[], tier:'standard', travelPremium:0, supplyAllowance:0, twoPerson:false, splitPct:50 };
+}
+
+function populateSelectOnce(){
+  $('fHomeSize').innerHTML = HOME_SIZE_BANDS.map(b=>`<option value="${b.id}">${b.label}</option>`).join('');
+  $('fServiceType').innerHTML = SERVICE_TYPES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('');
+  $('fTierGroup').innerHTML = TIERS.map(t=>`<button type="button" class="tier-btn" data-id="${t.id}">${t.label}<span>+${t.pct}%</span></button>`).join('');
+  document.querySelectorAll('#fTierGroup .tier-btn').forEach(b=> b.onclick = ()=>{ form.tier=b.dataset.id; renderModal(); });
+}
+
+function renderAddonList(){
+  const band = getBand(form.homeSizeBand);
+  $('fAddonList').innerHTML = ADDON_DEFS.map(a=>{
+    const available = isAddonAvailable(form.serviceType, a.id);
+    const checked = form.addons.some(x=>x.id===a.id);
+    const rate = band.addonRates ? band.addonRates[a.id] : 0;
+    return `<label class="addon-row ${available?'':'disabled'}">
+      <input type="checkbox" data-id="${a.id}" ${checked?'checked':''} ${available?'':'disabled'}>
+      <span class="addon-label">${a.label}${available?'':' <span class="hint-inline">· included in service</span>'}</span>
+      <span class="mono">$${rate}</span></label>`;
+  }).join('');
+  document.querySelectorAll('#fAddonList input[type=checkbox]').forEach(cb=>{
+    cb.onchange = ()=>{
+      form.addons = form.addons.filter(x=>x.id!==cb.dataset.id);
+      if(cb.checked) form.addons.push({id:cb.dataset.id, qty:1});
+      renderModal();
+    };
+  });
+}
+
+function renderModal(){
+  $('fJobRef').value = form.jobRef;
+  $('fServiceDate').value = form.serviceDate;
+  $('fContractor').value = form.contractorName;
+  $('fHomeSize').value = form.homeSizeBand;
+  $('fServiceType').value = form.serviceType;
+  $('fClientPrice').value = form.clientPrice;
+  $('fBasePayout').value = form.basePayout;
+  $('fTravel').value = form.travelPremium;
+  $('fSupply').value = form.supplyAllowance;
+  $('fTwoPerson').checked = form.twoPerson;
+  $('fSplitField').style.display = form.twoPerson ? '' : 'none';
+  $('fSplitPct').value = form.splitPct;
+
+  const band = getBand(form.homeSizeBand);
+  const range = getRange(band, form.serviceType);
+  $('fBasePayoutLabel').innerHTML = 'Base contractor payout ($)' + (range ? ` <span class="hint-inline">· guide: $${range.min}–$${range.max}</span>` : '');
+
+  renderAddonList();
+  document.querySelectorAll('#fTierGroup .tier-btn').forEach(b=> b.classList.toggle('active', b.dataset.id===form.tier));
+
+  const r = computeJobPayout(form);
+  $('stubBody').innerHTML = `
+    <div class="stub-row"><span>Base payout</span><span class="mono">${fmt(r.basePayout)}</span></div>
+    <div class="stub-row"><span>Add-ons</span><span class="mono">${fmt(r.addonsPayout)}</span></div>
+    <div class="stub-row"><span>Tier premium (${r.tierPct}%)</span><span class="mono">${fmt(r.tierAmount)}</span></div>
+    <div class="stub-row"><span>Travel</span><span class="mono">${fmt(r.travelPremium)}</span></div>
+    <div class="stub-row"><span>Supplies</span><span class="mono">${fmt(r.supplyAllowance)}</span></div>
+    <div class="stub-divider"></div>
+    <div class="stub-row stub-total"><span>Total payout</span><span class="mono">${fmt(r.totalPayout)}</span></div>
+    ${form.twoPerson ? `
+      <div class="stub-row"><span>Contractor A (${form.splitPct}%)</span><span class="mono">${fmt(r.splitAmountA)}</span></div>
+      <div class="stub-row"><span>Contractor B (${100-form.splitPct}%)</span><span class="mono">${fmt(r.splitAmountB)}</span></div>` : ''}
+    <div class="stub-row" style="color:${r.belowMinimumMargin?'var(--warn)':'var(--success)'}; font-weight:600;"><span>One:18 margin</span><span class="mono">${fmt(r.margin)}</span></div>`;
+  $('stubFlag').innerHTML = r.belowMinimumMargin
+    ? `<div style="background:var(--warn-bg);color:var(--warn);padding:8px 10px;border-radius:7px;">Below the $${MINIMUM_MARGIN} minimum margin guardrail.</div>`
+    : `<div style="background:var(--success-bg);color:var(--success);padding:8px 10px;border-radius:7px;">Margin meets the $${MINIMUM_MARGIN} guardrail.</div>`;
+}
+
+function openJobModal(job){
+  editingId = job ? job.id : null;
+  form = job ? { jobRef:job.jobRef, serviceDate:job.serviceDate, contractorName:job.contractorName,
+    homeSizeBand:job.homeSizeBand, serviceType:job.serviceType, clientPrice:job.clientPrice,
+    basePayout:job.basePayout, addons:job.addons, tier:job.tier, travelPremium:job.travelPremium,
+    supplyAllowance:job.supplyAllowance, twoPerson:job.twoPerson, splitPct:job.splitPct } : defaultForm();
+  basePayoutTouched = !!job;
+  $('jobModalTitle').textContent = job ? 'Edit job' : 'New job';
+  $('jobModalOverlay').classList.add('open');
+  renderModal();
+}
+function closeJobModal(){ $('jobModalOverlay').classList.remove('open'); }
+
+['fJobRef','fServiceDate','fContractor','fTravel','fSupply','fSplitPct'].forEach(id=>{
+  $(id).addEventListener('input', ()=>{
+    const map = { fJobRef:'jobRef', fServiceDate:'serviceDate', fContractor:'contractorName', fTravel:'travelPremium', fSupply:'supplyAllowance', fSplitPct:'splitPct' };
+    const key = map[id];
+    const isNum = ['travelPremium','supplyAllowance','splitPct'].includes(key);
+    form[key] = isNum ? Number($(id).value)||0 : $(id).value;
+    renderModal();
+  });
+});
+$('fClientPrice').addEventListener('input', ()=>{ form.clientPrice = Number($('fClientPrice').value)||0; renderModal(); });
+$('fBasePayout').addEventListener('input', ()=>{ basePayoutTouched = true; form.basePayout = Number($('fBasePayout').value)||0; renderModal(); });
+$('fHomeSize').addEventListener('change', ()=>{
+  form.homeSizeBand = $('fHomeSize').value;
+  if(!basePayoutTouched) form.basePayout = midpoint(getRange(getBand(form.homeSizeBand), form.serviceType));
+  renderModal();
+});
+$('fServiceType').addEventListener('change', ()=>{
+  form.serviceType = $('fServiceType').value;
+  if(!basePayoutTouched) form.basePayout = midpoint(getRange(getBand(form.homeSizeBand), form.serviceType));
+  renderModal();
+});
+$('fTwoPerson').addEventListener('change', ()=>{ form.twoPerson = $('fTwoPerson').checked; renderModal(); });
+
+$('jobModalClose').onclick = closeJobModal;
+$('jobModalCancel').onclick = closeJobModal;
+$('newJobBtn').onclick = ()=> openJobModal(null);
+
+$('jobModalSave').onclick = async ()=>{
+  if(!form.contractorName.trim() || form.clientPrice<=0){ toast('Enter a contractor and a client price above $0'); return; }
+  form.jobRef = form.jobRef.trim() || `J-${1000+allJobs.length+1}`;
+  $('jobModalSave').disabled = true; $('jobModalSave').textContent = 'Saving…';
+  try{
+    if(editingId){ await updateJobRow(editingId, form); toast('Job updated'); }
+    else { await createJobRow(form); toast('Job saved'); }
+    closeJobModal();
+    await reloadAndRender();
+  }catch(e){ toast(e.message || 'Could not save job'); }
+  finally{ $('jobModalSave').disabled = false; $('jobModalSave').textContent = 'Save job'; }
+};
+
+async function handleDeleteJob(id){
+  if(!confirm('Delete this job? This cannot be undone.')) return;
+  try{ await deleteJobRow(id); toast('Job deleted'); await reloadAndRender(); }
+  catch(e){ toast(e.message || 'Could not delete job'); }
+}
+
+$('syncBtn').onclick = async ()=>{
+  $('syncBtn').disabled = true; $('syncBtn').textContent = 'Syncing…';
+  try{
+    const res = await syncFromFieldApp();
+    const parts = [`${res.created} new`, `${res.updated} updated`];
+    if(res.needsPrice>0) parts.push(`${res.needsPrice} need a client price`);
+    toast(`Synced — ${parts.join(', ')}`);
+    await reloadAndRender();
+  }catch(e){ toast(e.message || 'Could not sync from field app'); }
+  finally{ $('syncBtn').disabled = false; $('syncBtn').textContent = '⟳ Sync from field app'; }
+};
+
+$('rangeSelect').addEventListener('change', renderOverview);
+$('searchInput').addEventListener('input', renderJobsTable);
+$('serviceFilter').addEventListener('change', renderJobsTable);
+$('contractorFilter').addEventListener('change', renderJobsTable);
+
+async function reloadAndRender(){
+  allJobs = await fetchJobs();
+  renderOverview();
+  renderContractorFilterOptions();
+  renderJobsTable();
+  renderContractors();
+}
+
+/* ---------------- Login flow ---------------- */
+function showLoginError(msg){ const el=$('loginError'); el.textContent=msg; el.classList.add('show'); }
+
+$('loginBtn').onclick = async ()=>{
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  $('loginError').classList.remove('show'); $('notAdminMsg').style.display='none';
+  if(!email || !password){ showLoginError('Enter your email and password'); return; }
+  $('loginBtn').disabled = true; $('loginBtn').textContent = 'Signing in…';
+  try{
+    await signIn(email, password);
+    if(!isAdmin()){ $('notAdminMsg').style.display='block'; clearSession(); return; }
+    $('loginGate').classList.add('hidden');
+    await reloadAndRender();
+  }catch(e){ showLoginError(e.message || 'Could not sign in.'); }
+  finally{ $('loginBtn').disabled = false; $('loginBtn').textContent = 'Log In'; }
+};
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') $('loginBtn').click(); });
+$('logoutBtn').onclick = ()=>{ if(!confirm('Log out?')) return; clearSession(); location.reload(); };
+
+/* ---------------- Init ---------------- */
+populateSelectOnce();
+renderRateCard();
+(async function init(){
+  const s = await ensureSession();
+  if(s && (session=s) && isAdmin()){
+    $('loginGate').classList.add('hidden');
+    await reloadAndRender();
+  } else {
+    if(s && !isAdmin()){ $('notAdminMsg').style.display='block'; clearSession(); }
+    $('loginGate').classList.remove('hidden');
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
