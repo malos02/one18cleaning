@@ -1236,12 +1236,10 @@
       });
     }
 
-    if(addTotal > 0){
-      const nums = baseRange.replace(/\$/g,'').split('–').map(n=>parseInt(n.trim()));
-      const total = `$${nums[0]+addTotal}–$${(nums[1]||nums[0])+addTotal}`;
-      return { range: total, label: tier.label, sqFt, addonsTotal: addTotal, addLabels };
-    }
-    return { range: baseRange, label: tier.label, sqFt, addonsTotal: 0 };
+    // Use top end of range for payout estimate
+    const topNum = parseInt(baseRange.replace(/\$/g,'').split('–').pop().trim());
+    const top = `$${topNum + addTotal}`;
+    return { range: top, label: tier.label, sqFt, addonsTotal: addTotal, addLabels };
   }
 
   function showAcceptanceScreen(){

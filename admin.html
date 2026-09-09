@@ -1781,13 +1781,9 @@
       });
     }
 
-    // Parse base range to get totals
-    const baseNums = baseRange.replace('$','').split('–').map(n=>parseInt(n.trim().replace('$','')));
-    const totalLow  = baseNums[0] + addLow;
-    const totalHigh = (baseNums[1]||baseNums[0]) + addHigh;
-    const total = addons.length > 0
-      ? `$${totalLow}–$${totalHigh}`
-      : baseRange;
+    // Use top end of range for payout estimate
+    const topNum = parseInt(baseRange.replace(/\$/g,'').split('–').pop().trim());
+    const total = `$${topNum + addHigh}`;
 
     return { baseRange, addons, total, label: tier.label, sqFt };
   }
