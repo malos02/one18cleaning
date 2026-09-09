@@ -489,6 +489,64 @@ async function deleteJobRow(id){
   if(!res.ok) throw new Error('Failed to delete job: '+res.status);
 }
 
+/* =========================================================================
+   CLIENT PRICING — One:18 Cleaning Official Residential Pricing Guide
+   Using top end of range for calculations.
+   Add-ons apply to Standard Recurring only — Deep Clean & Move-In/Out
+   already include baseboards, windows, blinds, fans, etc.
+   ========================================================================= */
+const CLIENT_PRICING = {
+  under_1200:     { standard:[125,145],  deep_clean:[250,300],  move_in_out:[300,350] },
+  size_1200_2000: { standard:[150,190],  deep_clean:[300,400],  move_in_out:[350,450] },
+  size_2001_3000: { standard:[190,240],  deep_clean:[400,525],  move_in_out:[450,575] },
+  size_3001_4000: { standard:[240,300],  deep_clean:[525,675],  move_in_out:[575,725] },
+  size_4001_5000: { standard:[300,375],  deep_clean:[675,825],  move_in_out:[725,875] },
+  over_5000:      { standard:null,       deep_clean:null,       move_in_out:null },
+};
+// Add-on client prices — Standard Recurring only
+// Deep Clean & Move-In/Out already include windows, baseboards, blinds, fans, cabinet exteriors
+const CLIENT_ADDON_PRICING = {
+  windows:    { under_1200:50,  size_1200_2000:75,  size_2001_3000:100, size_3001_4000:135, size_4001_5000:175 },
+  baseboards: { under_1200:40,  size_1200_2000:60,  size_2001_3000:80,  size_3001_4000:105, size_4001_5000:135 },
+  blinds:     { under_1200:35,  size_1200_2000:50,  size_2001_3000:70,  size_3001_4000:90,  size_4001_5000:115 },
+  fans:       { under_1200:30,  size_1200_2000:40,  size_2001_3000:55,  size_3001_4000:70,  size_4001_5000:90  },
+  cabinets:   { under_1200:50,  size_1200_2000:75,  size_2001_3000:100, size_3001_4000:130, size_4001_5000:160 },
+  petHair:    { under_1200:30,  size_1200_2000:45,  size_2001_3000:60,  size_3001_4000:80,  size_4001_5000:100 },
+  garage:     { under_1200:40,  size_1200_2000:50,  size_2001_3000:65,  size_3001_4000:80,  size_4001_5000:100 },
+  patio:      { under_1200:30,  size_1200_2000:40,  size_2001_3000:55,  size_3001_4000:70,  size_4001_5000:90  },
+  fridge:     { under_1200:40,  size_1200_2000:40,  size_2001_3000:40,  size_3001_4000:40,  size_4001_5000:40  }, // flat fee
+  oven:       { under_1200:40,  size_1200_2000:40,  size_2001_3000:40,  size_3001_4000:40,  size_4001_5000:40  }, // flat fee
+};
+// Add-ons included in each service (no separate charge)
+const ADDONS_INCLUDED_IN = {
+  windows:    ['deep_clean','move_in_out'],
+  baseboards: ['deep_clean','move_in_out'],
+  blinds:     ['deep_clean','move_in_out'],
+  fans:       ['deep_clean','move_in_out'],
+  cabinets:   ['move_in_out'], // cabinet exteriors in deep, interiors in move
+  petHair:    [],
+  garage:     [],
+  patio:      [],
+  fridge:     ['move_in_out'],
+  oven:       ['move_in_out'],
+};
+function calcClientPrice(band, serviceType, addonItems){
+  const bandPrices = CLIENT_PRICING[band];
+  if(!bandPrices) return 0;
+  const range = bandPrices[serviceType];
+  if(!range) return 0;
+  let total = range[1]; // top end of range
+  if(addonItems && Array.isArray(addonItems)){
+    addonItems.forEach(a=>{
+      const included = ADDONS_INCLUDED_IN[a.id] || [];
+      if(included.includes(serviceType)) return; // already in service
+      const addonPrices = CLIENT_ADDON_PRICING[a.id];
+      if(addonPrices && addonPrices[band]) total += addonPrices[band];
+    });
+  }
+  return total;
+}
+
 /* ---------------- Sync from the field app's jobs/contractors tables ---------------- */
 function parseHomeSizeSqFt(homeSize){
   if(!homeSize) return null;
@@ -544,7 +602,11 @@ async function syncFromFieldApp(){
     const serviceDate = (d.date || fj.approved_at || fj.updated_at).slice(0,10);
 
     const existing = existingByExternalId.get(fj.id);
-    const clientPrice = existing ? existing.clientPrice : 0;
+    // Client price priority: 1) stored in job data (admin set it), 2) existing accounting record, 3) calculate from rate card
+    const storedClientPrice = d.clientPrice && parseFloat(d.clientPrice) > 0 ? parseFloat(d.clientPrice) : 0;
+    const existingClientPrice = existing ? existing.clientPrice : 0;
+    const calculatedClientPrice = calcClientPrice(homeSizeBand, serviceType, addons);
+    const clientPrice = storedClientPrice || existingClientPrice || calculatedClientPrice;
     if(clientPrice <= 0) needsPrice++;
 
     const job = { jobRef, serviceDate, contractorName, homeSizeBand, serviceType, clientPrice, basePayout, addons,
