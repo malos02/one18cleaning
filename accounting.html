@@ -52,7 +52,9 @@
 
   /* ---------- Main / tabs ---------- */
   main{max-width:1060px; margin:0 auto; padding:24px 20px 80px;}
-  .tabs{display:flex; gap:20px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .tabs{display:flex; gap:20px; border-bottom:1px solid var(--line); margin-bottom:20px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab-btn{flex:none;}
   .tab-btn{background:none; border:none; padding:8px 2px 12px; font-size:13px; font-weight:600; color:var(--slate); border-bottom:2px solid transparent;}
   .tab-btn.active{color:var(--navy); border-bottom-color:var(--gold);}
   .panel{display:none;}
@@ -65,7 +67,37 @@
 
   /* ---------- Stat cards ---------- */
   .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px;}
+  .stat-grid-3{grid-template-columns:repeat(3,1fr);}
   @media (max-width:860px){ .stat-grid{grid-template-columns:repeat(2,1fr);} }
+
+  /* ---------- Mobile pass ---------- */
+  @media (max-width:640px){
+    main{padding:16px 12px 90px;}
+    .masthead{padding:12px 14px;}
+    .brand-name{font-size:14px;}
+    .masthead-actions{width:100%; justify-content:flex-end;}
+    .btn{padding:8px 12px; font-size:12.5px;}
+    h1{font-size:19px;}
+    .tabs{gap:14px; margin-bottom:16px;}
+    .tab-btn{font-size:12.5px; padding:7px 1px 10px;}
+    .section-head{gap:10px;}
+    select.range-select{width:100%;}
+    .stat-grid, .stat-grid-3{grid-template-columns:1fr !important;}
+    .stat-value{font-size:19px;}
+    .filter-row{flex-direction:column;}
+    .filter-row input, .filter-row select{width:100%; min-width:0;}
+    table{font-size:11.5px;}
+    th,td{padding:8px 9px;}
+    .modal-overlay{padding:0;}
+    .modal{max-width:100%; border-radius:0; min-height:100vh; padding:18px 16px 24px;}
+    .field-row{gap:8px;}
+    .field{min-width:0; flex:1 1 100%;}
+    .tier-group{flex-wrap:wrap;}
+    .tier-btn{flex:1 1 45%;}
+    .card{padding:14px;}
+    .card .btn{width:100%; justify-content:center;}
+    #newJobBtn, #newExpenseBtn, #syncBtn{width:auto;}
+  }
   .stat-card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:0 1px 2px rgba(19,36,65,.06);}
   .stat-card.accent{border-color:color-mix(in srgb, var(--gold) 40%, var(--line));}
   .stat-label{font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--slate); font-weight:600; margin-bottom:8px;}
@@ -274,7 +306,7 @@
       <button class="btn btn-gold" id="newExpenseBtn">+ Add expense</button>
     </div>
     <p class="lede">Recurring and one-time business costs — insurance, supplies, software, etc. Recurring amounts are normalized to a monthly figure and rolled into the Overview's operating expense and net profit stats.</p>
-    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);" id="expenseStats"></div>
+    <div class="stat-grid stat-grid-3" id="expenseStats"></div>
     <div class="table-wrap"><table>
       <thead><tr><th>Category</th><th>Description</th><th class="num">Amount</th><th>Frequency</th><th class="num">Monthly equiv.</th><th>Status</th><th></th></tr></thead>
       <tbody id="expensesTbody"></tbody>
@@ -319,8 +351,13 @@
           <option value="weekly">Weekly</option>
           <option value="yearly">Yearly</option>
           <option value="one_time">One-time</option>
+          <option value="lump_sum">Lump sum — spread over months</option>
         </select>
       </div>
+    </div>
+    <div class="field" id="eSpreadField" style="display:none;">
+      <label>Spread over <span class="hint-inline">(number of months, starting the month below)</span></label>
+      <input type="number" id="eSpreadMonths" min="1" step="1" value="12">
     </div>
     <div class="field"><label>Start date</label><input type="date" id="eStartDate"></div>
     <div class="switch-row"><input type="checkbox" id="eActive" checked> <span>Active (included in current totals)</span></div>
@@ -576,11 +613,11 @@ async function fetchExpenses(){
   const rows = await res.json();
   return rows.map(r=>({
     id:r.id, category:r.category, description:r.description||'', amount:Number(r.amount),
-    frequency:r.frequency, startDate:r.start_date, active:r.active,
+    frequency:r.frequency, startDate:r.start_date, active:r.active, spreadMonths:r.spread_months||null,
   }));
 }
 function expenseToRow(e){
-  return { category:e.category, description:e.description, amount:e.amount, frequency:e.frequency, start_date:e.startDate, active:e.active, updated_at:new Date().toISOString() };
+  return { category:e.category, description:e.description, amount:e.amount, frequency:e.frequency, start_date:e.startDate, active:e.active, spread_months:e.spreadMonths||null, updated_at:new Date().toISOString() };
 }
 async function createExpenseRow(e){
   const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses`, { method:'POST', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify(expenseToRow(e)) });
@@ -605,6 +642,13 @@ function monthlyEquivalent(e){
     const sd = new Date(e.startDate+'T00:00:00');
     const now = new Date();
     return (sd.getFullYear()===now.getFullYear() && sd.getMonth()===now.getMonth()) ? e.amount : 0;
+  }
+  if(e.frequency==='lump_sum'){
+    const months = Math.max(1, e.spreadMonths||1);
+    const sd = new Date(e.startDate+'T00:00:00');
+    const now = new Date();
+    const monthsElapsed = (now.getFullYear()-sd.getFullYear())*12 + (now.getMonth()-sd.getMonth());
+    return (monthsElapsed>=0 && monthsElapsed<months) ? e.amount/months : 0;
   }
   return 0;
 }
@@ -691,10 +735,40 @@ async function syncFromFieldApp(){
 /* =========================================================================
    UI — tabs, overview, jobs table, rate card, contractors, job modal
    ========================================================================= */
-function switchTab(name){
+
+/* ---------------- Back-button navigation (tabs + modals) ----------------
+   A stack tracks every screen opened on top of the base Overview tab: tab
+   switches and the two modals. Opening one pushes a history entry; the
+   phone/browser back button (or any in-app close/cancel/X, which just calls
+   goBack()) pops it and returns to whatever was underneath. */
+let navStack = ['overview'];
+function navPush(id){
+  navStack.push(id);
+  history.pushState({navDepth:navStack.length}, '');
+}
+function goBack(){ history.back(); }
+function closeScreen(id){
+  if(id==='jobModal'){ closeJobModalUI(); }
+  else if(id==='expenseModal'){ closeExpenseModalUI(); }
+  else { applyTabUI(navStack[navStack.length-1] || 'overview'); }
+}
+history.pushState({navDepth:navStack.length}, '');
+window.addEventListener('popstate', ()=>{
+  history.pushState({navDepth:navStack.length}, ''); // keep trapping so back never leaves the app
+  if(navStack.length > 1){
+    const closed = navStack.pop();
+    closeScreen(closed);
+  }
+});
+
+function applyTabUI(name){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+name));
   window.scrollTo({top:0, behavior:'smooth'});
+}
+function switchTab(name){
+  applyTabUI(name);
+  if(navStack[navStack.length-1] !== name) navPush(name);
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
@@ -884,7 +958,10 @@ function renderRateCard(){
     <tr><td>${a.label}</td>${bands5.map(b=>`<td class="num mono">$${b.addonRates[a.id]}</td>`).join('')}</tr>`).join('');
 }
 
-function freqLabel(f){ return {monthly:'Monthly', weekly:'Weekly', yearly:'Yearly', one_time:'One-time'}[f] || f; }
+function freqLabel(f, e){
+  if(f==='lump_sum') return `Lump sum${e && e.spreadMonths ? ` (over ${e.spreadMonths} mo)` : ''}`;
+  return {monthly:'Monthly', weekly:'Weekly', yearly:'Yearly', one_time:'One-time'}[f] || f;
+}
 
 function renderExpenses(){
   const totalMonthly = computeMonthlyOperatingExpenses();
@@ -905,7 +982,7 @@ function renderExpenses(){
       <td>${escapeHtml(e.category)}</td>
       <td>${escapeHtml(e.description)}</td>
       <td class="num mono">${fmt(e.amount)}</td>
-      <td>${freqLabel(e.frequency)}</td>
+      <td>${freqLabel(e.frequency, e)}</td>
       <td class="num mono">${fmt(monthlyEquivalent(e))}</td>
       <td>${e.active ? `<span class="badge badge-ok">Active</span>` : `<span class="badge badge-outline">Inactive</span>`}</td>
       <td style="text-align:right;">
@@ -925,11 +1002,18 @@ function openExpenseModal(expense){
   $('eDescription').value = expense ? expense.description : '';
   $('eAmount').value = expense ? expense.amount : 0;
   $('eFrequency').value = expense ? expense.frequency : 'monthly';
+  $('eSpreadMonths').value = expense && expense.spreadMonths ? expense.spreadMonths : 12;
+  $('eSpreadField').style.display = $('eFrequency').value==='lump_sum' ? '' : 'none';
   $('eStartDate').value = expense ? expense.startDate : new Date().toISOString().slice(0,10);
   $('eActive').checked = expense ? expense.active : true;
   $('expenseModalOverlay').classList.add('open');
+  navPush('expenseModal');
 }
-function closeExpenseModal(){ $('expenseModalOverlay').classList.remove('open'); }
+function closeExpenseModalUI(){ $('expenseModalOverlay').classList.remove('open'); }
+function closeExpenseModal(){ goBack(); }
+$('eFrequency').addEventListener('change', ()=>{
+  $('eSpreadField').style.display = $('eFrequency').value==='lump_sum' ? '' : 'none';
+});
 $('expenseModalClose').onclick = closeExpenseModal;
 $('expenseModalCancel').onclick = closeExpenseModal;
 $('newExpenseBtn').onclick = ()=> openExpenseModal(null);
@@ -941,7 +1025,7 @@ $('expenseModalSave').onclick = async ()=>{
   const payload = {
     category, description: $('eDescription').value.trim(), amount,
     frequency: $('eFrequency').value, startDate: $('eStartDate').value || new Date().toISOString().slice(0,10),
-    active: $('eActive').checked,
+    active: $('eActive').checked, spreadMonths: $('eFrequency').value==='lump_sum' ? (Number($('eSpreadMonths').value)||12) : null,
   };
   $('expenseModalSave').disabled = true; $('expenseModalSave').textContent = 'Saving…';
   try{
@@ -1017,8 +1101,8 @@ $('exportContractorsBtn').onclick = ()=>{
   toast(`Exported ${body.length} contractor${body.length===1?'':'s'}`);
 };
 $('exportExpensesBtn').onclick = ()=>{
-  const header = ['Category','Description','Amount','Frequency','Start Date','Monthly Equivalent','Active'];
-  const body = allExpenses.map(e=>[e.category, e.description, e.amount.toFixed(2), freqLabel(e.frequency), e.startDate, monthlyEquivalent(e).toFixed(2), e.active?'Yes':'No']);
+  const header = ['Category','Description','Amount','Frequency','Spread (months)','Start Date','Monthly Equivalent','Active'];
+  const body = allExpenses.map(e=>[e.category, e.description, e.amount.toFixed(2), freqLabel(e.frequency, e), e.spreadMonths||'', e.startDate, monthlyEquivalent(e).toFixed(2), e.active?'Yes':'No']);
   downloadCsv(`one18-expenses-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
   toast(`Exported ${body.length} expense${body.length===1?'':'s'}`);
 };
@@ -1111,8 +1195,10 @@ function openJobModal(job){
   $('jobModalTitle').textContent = job ? 'Edit job' : 'New job';
   $('jobModalOverlay').classList.add('open');
   renderModal();
+  navPush('jobModal');
 }
-function closeJobModal(){ $('jobModalOverlay').classList.remove('open'); }
+function closeJobModalUI(){ $('jobModalOverlay').classList.remove('open'); }
+function closeJobModal(){ goBack(); }
 
 ['fJobRef','fServiceDate','fContractor','fTravel','fSupply','fSplitPct'].forEach(id=>{
   $(id).addEventListener('input', ()=>{

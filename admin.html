@@ -935,6 +935,40 @@
 
   let detailReturnTab = 'jobs';
 
+  /* ---------------- Back-button navigation (all screens/modals) ----------------
+     A single stack tracks every "screen" opened on top of the base Jobs tab:
+     tab switches, the job detail view, the four modals, and the photo lightbox.
+     Opening one pushes a history entry; the phone/browser back button (or any
+     in-app close/cancel/X control, which just calls goBack()) pops it and
+     returns to whatever was underneath — same as the app's own back button. */
+  let navStack = ['jobs'];
+  function navPush(id){
+    navStack.push(id);
+    history.pushState({navDepth:navStack.length}, '');
+  }
+  function goBack(){ history.back(); }
+  function closeScreen(id){
+    if(id==='detail'){
+      $('detailOverlay').classList.remove('open');
+      currentDetailJob = null;
+      if(detailReturnTab === 'contractors'){ setActiveTab('contractors', true); renderContractors(); }
+      else { setActiveTab('jobs', true); renderList(); }
+    } else if(id==='createJobModal'){ $('createJobModal').style.display='none'; }
+    else if(id==='editContractorModal'){ $('editContractorModal').style.display='none'; }
+    else if(id==='assignModal'){ $('assignModal').style.display='none'; }
+    else if(id==='paymentModal'){ $('paymentModal').style.display='none'; }
+    else if(id==='lightbox'){ $('lightbox').classList.remove('open'); }
+    else if(id==='team'){ setActiveTab('jobs', true); }
+  }
+  history.pushState({navDepth:navStack.length}, '');
+  window.addEventListener('popstate', ()=>{
+    history.pushState({navDepth:navStack.length}, ''); // keep trapping so back never leaves the app
+    if(navStack.length > 1){
+      const closed = navStack.pop();
+      closeScreen(closed);
+    }
+  });
+
   function openDetail(j){
     currentDetailJob = j;
     detailMode = 'view';
@@ -942,24 +976,8 @@
     updateModeTabs();
     renderDetail();
     $('detailOverlay').classList.add('open');
-    history.pushState({view:'detail'}, '');
+    navPush('detail');
   }
-
-  // Phone back button — return to whichever tab opened the detail
-  history.pushState({view:'list'}, '');
-  window.addEventListener('popstate', ()=>{
-    history.pushState({view:'list'}, '');
-    if($('detailOverlay').classList.contains('open')){
-      $('detailOverlay').classList.remove('open');
-      currentDetailJob = null;
-      if(detailReturnTab === 'contractors'){
-        setActiveTab('contractors');
-        renderContractors();
-      } else {
-        renderList();
-      }
-    }
-  });
 
   function updateModeTabs(){
     $('viewTabBtn').classList.toggle('active', detailMode === 'view');
@@ -1280,9 +1298,9 @@
     return card;
   }
 
-  function openLightbox(src){ $('lightboxImg').src = src; $('lightbox').classList.add('open'); }
-  $('lightboxClose').onclick = ()=> $('lightbox').classList.remove('open');
-  $('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') $('lightbox').classList.remove('open'); });
+  function openLightbox(src){ $('lightboxImg').src = src; $('lightbox').classList.add('open'); navPush('lightbox'); }
+  $('lightboxClose').onclick = goBack;
+  $('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') goBack(); });
 
   /* ---------------- Export to CSV ---------------- */
   $('exportBtn').onclick = ()=>{
@@ -1343,7 +1361,7 @@
   };
 
   /* ---------------- Tabs ---------------- */
-  function setActiveTab(tab){
+  function setActiveTab(tab, fromHistory){
     const isJobs = tab === 'jobs';
     $('tabJobs').style.background = isJobs ? '#fff' : 'rgba(255,255,255,0.1)';
     $('tabJobs').style.color = isJobs ? 'var(--navy)' : '#fff';
@@ -1351,9 +1369,10 @@
     $('tabContractors').style.color = !isJobs ? 'var(--navy)' : '#fff';
     $('jobsView').style.display = isJobs ? 'block' : 'none';
     $('contractorsView').classList.toggle('open', !isJobs);
+    if(!fromHistory && !isJobs && navStack[navStack.length-1] !== 'team') navPush('team');
   }
 
-  $('tabJobs').onclick = ()=> setActiveTab('jobs');
+  $('tabJobs').onclick = ()=>{ if(navStack[navStack.length-1]==='team') goBack(); else setActiveTab('jobs'); };
   $('tabContractors').onclick = async ()=>{
     setActiveTab('team');
     renderContractors();
@@ -1553,10 +1572,11 @@
     });
 
     $('assignModal').style.display = 'flex';
+    navPush('assignModal');
   }
 
-  $('assignCloseBtn').onclick = ()=> $('assignModal').style.display = 'none';
-  $('assignModal').addEventListener('click', e=>{ if(e.target.id==='assignModal') $('assignModal').style.display='none'; });
+  $('assignCloseBtn').onclick = goBack;
+  $('assignModal').addEventListener('click', e=>{ if(e.target.id==='assignModal') goBack(); });
 
   $('assignCustomBtn').onclick = ()=>{
     const email = $('assignCustomEmail').value.trim();
@@ -1647,7 +1667,7 @@
         })
       }).catch(e=> console.error('Email failed:', e));
 
-      $('assignModal').style.display = 'none';
+      goBack();
       toast(`Assigned to ${name} — email sent`);
       await loadAllJobs();
       renderList();
@@ -1797,8 +1817,9 @@
     $('editCtEmail').value = c.email || '';
     $('editCtPhone').value = c.phone || '';
     $('editContractorModal').style.display = 'flex';
+    navPush('editContractorModal');
   }
-  $('editCtCancelBtn').onclick = ()=> $('editContractorModal').style.display = 'none';
+  $('editCtCancelBtn').onclick = goBack;
   $('editCtSaveBtn').onclick = async ()=>{
     if(!editingContractor) return;
     const name = $('editCtName').value.trim();
@@ -1814,7 +1835,7 @@
       const idx = contractors.findIndex(c=>c.email===editingContractor.email);
       if(idx>=0){ contractors[idx].name = name; contractors[idx].phone = phone||null; }
       contractorNameMap[editingContractor.email] = name;
-      $('editContractorModal').style.display = 'none';
+      goBack();
       toast('Contractor updated');
       renderContractors();
     }catch(e){ alert('Could not save changes'); }
@@ -1828,8 +1849,9 @@
     $('payAmount').value = '';
     $('payNotes').value = '';
     $('paymentModal').style.display = 'flex';
+    navPush('paymentModal');
   };
-  $('payCancelBtn').onclick = ()=> $('paymentModal').style.display = 'none';
+  $('payCancelBtn').onclick = goBack;
   $('payConfirmBtn').onclick = async ()=>{
     const amount = parseFloat($('payAmount').value);
     if(!amount || amount <= 0){ alert('Enter a valid payment amount'); return; }
@@ -1885,7 +1907,7 @@
         }).catch(e=>console.error('Payment email failed:',e));
       }
 
-      $('paymentModal').style.display = 'none';
+      goBack();
       $('markPaidBtn').style.display = 'none';
       toast(`Payment of $${amount.toFixed(2)} recorded`);
       renderDetail();
@@ -1894,11 +1916,7 @@
     }catch(e){ alert('Could not save payment'); }
   };
 
-  $('backBtn').onclick = ()=>{
-    $('detailOverlay').classList.remove('open');
-    currentDetailJob = null;
-    renderList();
-  };
+  $('backBtn').onclick = goBack;
 
   /* ---------------- Create / assign job ---------------- */
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
@@ -1912,9 +1930,10 @@
     document.querySelectorAll('#cjAddons input[type=checkbox]').forEach(cb=>cb.checked=false);
     $('cjError').classList.remove('show');
     $('createJobModal').style.display='flex';
+    navPush('createJobModal');
   };
-  $('createJobCloseBtn').onclick = ()=> $('createJobModal').style.display='none';
-  $('createJobModal').addEventListener('click', e=>{ if(e.target.id==='createJobModal') $('createJobModal').style.display='none'; });
+  $('createJobCloseBtn').onclick = goBack;
+  $('createJobModal').addEventListener('click', e=>{ if(e.target.id==='createJobModal') goBack(); });
 
   // Live pay estimate update when size or service level changes
   function updateCjPayEstimate(){
@@ -2041,7 +2060,7 @@
         })
       });
       if(!res.ok) throw new Error('Could not create job: '+res.status);
-      $('createJobModal').style.display='none';
+      goBack();
       await loadAllJobs();
       renderList();
       toast(`Job assigned to ${contractor}`);
@@ -2136,7 +2155,7 @@
       });
       j.status = newStatus;
       toast(isArchived ? 'Job unarchived' : 'Job archived');
-      $('detailOverlay').classList.remove('open');
+      goBack();
       currentDetailJob = null;
       await loadAllJobs();
       renderList();
@@ -2210,7 +2229,7 @@
         toast('Job deleted');
       }
       currentDetailJob = null;
-      $('detailOverlay').classList.remove('open');
+      goBack();
       await loadAllJobs();
       renderList();
     }catch(e){
