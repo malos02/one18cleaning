@@ -97,6 +97,14 @@
   .filter-row input, .filter-row select{border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; background:var(--paper);}
   .filter-row input{flex:1; min-width:200px;}
   .rank-cell{width:26px; text-align:center; font-family:'IBM Plex Mono',monospace;}
+  .stat-card.clickable{cursor:pointer; transition:box-shadow .15s ease, border-color .15s ease;}
+  .stat-card.clickable:hover{box-shadow:0 3px 10px rgba(19,36,65,.12); border-color:var(--gold);}
+  .svc-row.clickable{cursor:pointer; border-radius:5px; padding:3px 4px; margin:0 -4px;}
+  .svc-row.clickable:hover{background:color-mix(in srgb, var(--gold) 10%, transparent);}
+  tr.clickable-row{cursor:pointer;}
+  tr.clickable-row:hover td{background:color-mix(in srgb, var(--gold) 8%, transparent);}
+  .filter-banner{display:flex; align-items:center; justify-content:space-between; background:var(--warn-bg); color:var(--warn); border-radius:8px; padding:8px 12px; font-size:12.5px; margin-bottom:12px;}
+  .filter-banner .icon-btn{border-color:var(--warn); color:var(--warn);}
 
   /* ---------- Chart ---------- */
   .chart-wrap{width:100%; overflow-x:auto;}
@@ -177,6 +185,8 @@
     <button class="tab-btn" data-tab="jobs">Jobs</button>
     <button class="tab-btn" data-tab="rateCard">Rate card</button>
     <button class="tab-btn" data-tab="contractors">Contractors</button>
+    <button class="tab-btn" data-tab="expenses">Expenses</button>
+    <button class="tab-btn" data-tab="export">Export</button>
   </div>
 
   <!-- ===================== OVERVIEW ===================== -->
@@ -184,9 +194,11 @@
     <div class="section-head">
       <div><div class="eyebrow">Dashboard</div><h1>Books at a glance</h1></div>
       <select class="range-select" id="rangeSelect">
+        <option value="week">This week</option>
         <option value="month" selected>This month</option>
-        <option value="30d">Last 30 days</option>
         <option value="quarter">This quarter</option>
+        <option value="year">This year</option>
+        <option value="30d">Last 30 days</option>
         <option value="all">All time</option>
       </select>
     </div>
@@ -214,6 +226,7 @@
       </select>
       <select id="contractorFilter"><option value="all">All contractors</option></select>
     </div>
+    <div class="filter-banner" id="jobsFilterBanner" style="display:none;"></div>
     <div class="table-wrap"><table id="jobsTable">
       <thead><tr>
         <th>Date</th><th>Job #</th><th>Contractor</th><th>Service</th><th>Size</th>
@@ -253,7 +266,70 @@
       <tbody id="contractorsTbody"></tbody>
     </table></div>
   </section>
+
+  <!-- ===================== EXPENSES ===================== -->
+  <section class="panel" id="panel-expenses">
+    <div class="section-head">
+      <div><div class="eyebrow">Overhead</div><h1>Operating expenses</h1></div>
+      <button class="btn btn-gold" id="newExpenseBtn">+ Add expense</button>
+    </div>
+    <p class="lede">Recurring and one-time business costs — insurance, supplies, software, etc. Recurring amounts are normalized to a monthly figure and rolled into the Overview's operating expense and net profit stats.</p>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);" id="expenseStats"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Category</th><th>Description</th><th class="num">Amount</th><th>Frequency</th><th class="num">Monthly equiv.</th><th>Status</th><th></th></tr></thead>
+      <tbody id="expensesTbody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================== EXPORT ===================== -->
+  <section class="panel" id="panel-export">
+    <div class="section-head"><div><div class="eyebrow">Data</div><h1>Export accounting data</h1></div></div>
+    <p class="lede">Exports respect the Jobs tab's current filters (search, service, contractor). Files download as CSV, ready for Excel, Sheets, or your accountant.</p>
+    <div class="card">
+      <h3>Jobs export</h3>
+      <p class="lede" style="margin-bottom:12px;">Exports the jobs currently matching your Jobs tab filters (<span id="exportJobsCount">0</span> job(s)).</p>
+      <button class="btn btn-primary" id="exportJobsBtn">⬇ Export jobs (CSV)</button>
+    </div>
+    <div class="card">
+      <h3>Contractor summary export</h3>
+      <p class="lede" style="margin-bottom:12px;">One row per contractor — job count, revenue, payout, and margin totals.</p>
+      <button class="btn btn-primary" id="exportContractorsBtn">⬇ Export contractor summary (CSV)</button>
+    </div>
+    <div class="card">
+      <h3>Expenses export</h3>
+      <p class="lede" style="margin-bottom:12px;">All logged operating expenses, active and inactive.</p>
+      <button class="btn btn-primary" id="exportExpensesBtn">⬇ Export expenses (CSV)</button>
+    </div>
+  </section>
 </main>
+
+<!-- ===================== EXPENSE MODAL ===================== -->
+<div class="modal-overlay" id="expenseModalOverlay">
+  <div class="modal" style="max-width:440px;">
+    <button class="close-x" id="expenseModalClose">✕</button>
+    <h2 id="expenseModalTitle">Add expense</h2>
+    <p class="modal-sub">Tracked for monthly operating-expense and net-profit calculations.</p>
+    <div class="field"><label>Category</label><input type="text" id="eCategory" placeholder="Insurance, Supplies, Software…"></div>
+    <div class="field"><label>Description <span class="hint-inline">(optional)</span></label><input type="text" id="eDescription" placeholder="e.g. General liability policy"></div>
+    <div class="field-row">
+      <div class="field"><label>Amount ($)</label><input type="number" id="eAmount" min="0" step="1" value="0"></div>
+      <div class="field"><label>Frequency</label>
+        <select id="eFrequency">
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="yearly">Yearly</option>
+          <option value="one_time">One-time</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Start date</label><input type="date" id="eStartDate"></div>
+    <div class="switch-row"><input type="checkbox" id="eActive" checked> <span>Active (included in current totals)</span></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="expenseModalCancel">Cancel</button>
+      <button class="btn btn-primary" id="expenseModalSave">Save expense</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===================== NEW / EDIT JOB MODAL ===================== -->
 <div class="modal-overlay" id="jobModalOverlay">
@@ -490,61 +566,50 @@ async function deleteJobRow(id){
 }
 
 /* =========================================================================
-   CLIENT PRICING — One:18 Cleaning Official Residential Pricing Guide
-   Using top end of range for calculations.
-   Add-ons apply to Standard Recurring only — Deep Clean & Move-In/Out
-   already include baseboards, windows, blinds, fans, etc.
+   EXPENSES — accounting_expenses table (insurance, supplies, software, etc.)
    ========================================================================= */
-const CLIENT_PRICING = {
-  under_1200:     { standard:[125,145],  deep_clean:[250,300],  move_in_out:[300,350] },
-  size_1200_2000: { standard:[150,190],  deep_clean:[300,400],  move_in_out:[350,450] },
-  size_2001_3000: { standard:[190,240],  deep_clean:[400,525],  move_in_out:[450,575] },
-  size_3001_4000: { standard:[240,300],  deep_clean:[525,675],  move_in_out:[575,725] },
-  size_4001_5000: { standard:[300,375],  deep_clean:[675,825],  move_in_out:[725,875] },
-  over_5000:      { standard:null,       deep_clean:null,       move_in_out:null },
-};
-// Add-on client prices — Standard Recurring only
-// Deep Clean & Move-In/Out already include windows, baseboards, blinds, fans, cabinet exteriors
-const CLIENT_ADDON_PRICING = {
-  windows:    { under_1200:50,  size_1200_2000:75,  size_2001_3000:100, size_3001_4000:135, size_4001_5000:175 },
-  baseboards: { under_1200:40,  size_1200_2000:60,  size_2001_3000:80,  size_3001_4000:105, size_4001_5000:135 },
-  blinds:     { under_1200:35,  size_1200_2000:50,  size_2001_3000:70,  size_3001_4000:90,  size_4001_5000:115 },
-  fans:       { under_1200:30,  size_1200_2000:40,  size_2001_3000:55,  size_3001_4000:70,  size_4001_5000:90  },
-  cabinets:   { under_1200:50,  size_1200_2000:75,  size_2001_3000:100, size_3001_4000:130, size_4001_5000:160 },
-  petHair:    { under_1200:30,  size_1200_2000:45,  size_2001_3000:60,  size_3001_4000:80,  size_4001_5000:100 },
-  garage:     { under_1200:40,  size_1200_2000:50,  size_2001_3000:65,  size_3001_4000:80,  size_4001_5000:100 },
-  patio:      { under_1200:30,  size_1200_2000:40,  size_2001_3000:55,  size_3001_4000:70,  size_4001_5000:90  },
-  fridge:     { under_1200:40,  size_1200_2000:40,  size_2001_3000:40,  size_3001_4000:40,  size_4001_5000:40  }, // flat fee
-  oven:       { under_1200:40,  size_1200_2000:40,  size_2001_3000:40,  size_3001_4000:40,  size_4001_5000:40  }, // flat fee
-};
-// Add-ons included in each service (no separate charge)
-const ADDONS_INCLUDED_IN = {
-  windows:    ['deep_clean','move_in_out'],
-  baseboards: ['deep_clean','move_in_out'],
-  blinds:     ['deep_clean','move_in_out'],
-  fans:       ['deep_clean','move_in_out'],
-  cabinets:   ['move_in_out'], // cabinet exteriors in deep, interiors in move
-  petHair:    [],
-  garage:     [],
-  patio:      [],
-  fridge:     ['move_in_out'],
-  oven:       ['move_in_out'],
-};
-function calcClientPrice(band, serviceType, addonItems){
-  const bandPrices = CLIENT_PRICING[band];
-  if(!bandPrices) return 0;
-  const range = bandPrices[serviceType];
-  if(!range) return 0;
-  let total = range[1]; // top end of range
-  if(addonItems && Array.isArray(addonItems)){
-    addonItems.forEach(a=>{
-      const included = ADDONS_INCLUDED_IN[a.id] || [];
-      if(included.includes(serviceType)) return; // already in service
-      const addonPrices = CLIENT_ADDON_PRICING[a.id];
-      if(addonPrices && addonPrices[band]) total += addonPrices[band];
-    });
+let allExpenses = [];
+
+async function fetchExpenses(){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses?select=*&order=category.asc`, { headers: authHeaders() });
+  if(!res.ok) throw new Error('Failed to load expenses: '+res.status);
+  const rows = await res.json();
+  return rows.map(r=>({
+    id:r.id, category:r.category, description:r.description||'', amount:Number(r.amount),
+    frequency:r.frequency, startDate:r.start_date, active:r.active,
+  }));
+}
+function expenseToRow(e){
+  return { category:e.category, description:e.description, amount:e.amount, frequency:e.frequency, start_date:e.startDate, active:e.active, updated_at:new Date().toISOString() };
+}
+async function createExpenseRow(e){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses`, { method:'POST', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify(expenseToRow(e)) });
+  if(!res.ok) throw new Error('Failed to save expense: '+res.status);
+}
+async function updateExpenseRow(id, e){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify(expenseToRow(e)) });
+  if(!res.ok) throw new Error('Failed to update expense: '+res.status);
+}
+async function deleteExpenseRow(id){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses?id=eq.${encodeURIComponent(id)}`, { method:'DELETE', headers: authHeaders() });
+  if(!res.ok) throw new Error('Failed to delete expense: '+res.status);
+}
+
+/* Normalize any expense to its monthly-equivalent cost */
+function monthlyEquivalent(e){
+  if(e.frequency==='monthly') return e.amount;
+  if(e.frequency==='weekly') return e.amount * (52/12);
+  if(e.frequency==='yearly') return e.amount / 12;
+  if(e.frequency==='one_time'){
+    // Count a one-time expense only in the month it was incurred
+    const sd = new Date(e.startDate+'T00:00:00');
+    const now = new Date();
+    return (sd.getFullYear()===now.getFullYear() && sd.getMonth()===now.getMonth()) ? e.amount : 0;
   }
-  return total;
+  return 0;
+}
+function computeMonthlyOperatingExpenses(){
+  return allExpenses.filter(e=>e.active).reduce((s,e)=> s+monthlyEquivalent(e), 0);
 }
 
 /* ---------------- Sync from the field app's jobs/contractors tables ---------------- */
@@ -602,11 +667,7 @@ async function syncFromFieldApp(){
     const serviceDate = (d.date || fj.approved_at || fj.updated_at).slice(0,10);
 
     const existing = existingByExternalId.get(fj.id);
-    // Client price priority: 1) stored in job data (admin set it), 2) existing accounting record, 3) calculate from rate card
-    const storedClientPrice = d.clientPrice && parseFloat(d.clientPrice) > 0 ? parseFloat(d.clientPrice) : 0;
-    const existingClientPrice = existing ? existing.clientPrice : 0;
-    const calculatedClientPrice = calcClientPrice(homeSizeBand, serviceType, addons);
-    const clientPrice = storedClientPrice || existingClientPrice || calculatedClientPrice;
+    const clientPrice = existing ? existing.clientPrice : 0;
     if(clientPrice <= 0) needsPrice++;
 
     const job = { jobRef, serviceDate, contractorName, homeSizeBand, serviceType, clientPrice, basePayout, addons,
@@ -630,14 +691,25 @@ async function syncFromFieldApp(){
 /* =========================================================================
    UI — tabs, overview, jobs table, rate card, contractors, job modal
    ========================================================================= */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+name));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
 document.querySelectorAll('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    btn.classList.add('active');
-    $('panel-'+btn.dataset.tab).classList.add('active');
-  });
+  btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
 });
+
+/* Jump from Overview/Contractors into Jobs with a filter pre-applied */
+let belowMarginOnly = false;
+function goToJobs({service, contractor, belowMarginOnly:bmo}={}){
+  belowMarginOnly = !!bmo;
+  $('serviceFilter').value = service || 'all';
+  $('contractorFilter').value = contractor && Array.from($('contractorFilter').options).some(o=>o.value===contractor) ? contractor : 'all';
+  $('searchInput').value = '';
+  switchTab('jobs');
+  renderJobsTable();
+}
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -645,7 +717,13 @@ function isWithinRange(dateStr, range, now){
   const d = new Date(dateStr+'T00:00:00');
   if(range==='all') return true;
   if(range==='30d'){ const c=new Date(now); c.setDate(c.getDate()-30); return d>=c; }
+  if(range==='week'){
+    const c = new Date(now); const day = c.getDay(); // 0=Sun
+    c.setDate(c.getDate()-day); c.setHours(0,0,0,0);
+    return d>=c;
+  }
   if(range==='month') return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  if(range==='year') return d.getFullYear()===now.getFullYear();
   const q = Math.floor(now.getMonth()/3), dq = Math.floor(d.getMonth()/3);
   return d.getFullYear()===now.getFullYear() && dq===q;
 }
@@ -671,16 +749,29 @@ function renderOverview(){
     name: new Date(k+'-02').toLocaleDateString(undefined,{month:'short'}), revenue: Math.round(v.revenue), payout: Math.round(v.payout),
   }));
 
+  const opEx = computeMonthlyOperatingExpenses();
+  const netProfit = margin - opEx;
+
   $('overviewStats').innerHTML = `
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value mono">${fmt(revenue)}</div><div class="stat-sub">${ranged.length} job${ranged.length===1?'':'s'}</div></div>
-      <div class="stat-card"><div class="stat-label">Contractor payouts</div><div class="stat-value mono">${fmt(payout)}</div><div class="stat-sub">total compensation paid</div></div>
-      <div class="stat-card accent"><div class="stat-label">Gross margin</div><div class="stat-value mono">${fmt(margin)}</div>
-        <div class="stat-sub">${belowMin>0 ? `<span class="badge badge-warn">${belowMin} below $${MINIMUM_MARGIN} guardrail</span>` : `<span class="badge badge-ok">all jobs meet guardrail</span>`}</div></div>
+      <div class="stat-card clickable" id="statRevenue"><div class="stat-label">Revenue</div><div class="stat-value mono">${fmt(revenue)}</div><div class="stat-sub">${ranged.length} job${ranged.length===1?'':'s'} · view jobs →</div></div>
+      <div class="stat-card clickable" id="statPayout"><div class="stat-label">Contractor payouts</div><div class="stat-value mono">${fmt(payout)}</div><div class="stat-sub">total compensation paid</div></div>
+      <div class="stat-card accent ${belowMin>0?'clickable':''}" id="statMargin"><div class="stat-label">Gross margin</div><div class="stat-value mono">${fmt(margin)}</div>
+        <div class="stat-sub">${belowMin>0 ? `<span class="badge badge-warn">${belowMin} below $${MINIMUM_MARGIN} guardrail →</span>` : `<span class="badge badge-ok">all jobs meet guardrail</span>`}</div></div>
       <div class="stat-card"><div class="stat-label">By service type</div>
-        ${SERVICE_TYPES.map(s=>`<div class="svc-row"><span>${s.label}</span><span class="mono">${byService[s.id]}</span></div>`).join('')}
+        ${SERVICE_TYPES.map(s=>`<div class="svc-row clickable" data-svc="${s.id}"><span>${s.label}</span><span class="mono">${byService[s.id]}</span></div>`).join('')}
       </div>
+      <div class="stat-card"><div class="stat-label">Monthly operating expenses</div><div class="stat-value mono">${fmt(opEx)}</div><div class="stat-sub">insurance, supplies, etc. · <a href="#" id="statExpensesLink" style="color:var(--gold);">manage →</a></div></div>
+      <div class="stat-card accent"><div class="stat-label">Net profit (this range)</div><div class="stat-value mono" style="color:${netProfit<0?'var(--warn)':'var(--navy)'};">${fmt(netProfit)}</div><div class="stat-sub">gross margin minus monthly operating expenses</div></div>
     </div>`;
+
+  $('statRevenue').onclick = ()=> goToJobs({});
+  $('statPayout').onclick = ()=> goToJobs({});
+  if(belowMin>0) $('statMargin').onclick = ()=> goToJobs({belowMarginOnly:true});
+  document.querySelectorAll('#overviewStats .svc-row.clickable').forEach(row=>{
+    row.onclick = ()=> goToJobs({service:row.dataset.svc});
+  });
+  $('statExpensesLink').onclick = (e)=>{ e.preventDefault(); switchTab('expenses'); };
 
   const chartEl = $('trendChart');
   if(trend.length===0){ chartEl.innerHTML = `<div class="empty-state">No jobs in this range yet.</div>`; return; }
@@ -715,14 +806,24 @@ function renderJobsTable(){
   const q = $('searchInput').value.trim().toLowerCase();
   const svc = $('serviceFilter').value;
   const ctr = $('contractorFilter').value;
+  const bannerEl = $('jobsFilterBanner');
+  if(belowMarginOnly){
+    bannerEl.style.display = 'flex';
+    bannerEl.innerHTML = `<span>Showing only jobs below the $${MINIMUM_MARGIN} margin guardrail</span><button class="icon-btn" id="clearMarginFilter">Clear</button>`;
+    $('clearMarginFilter').onclick = ()=>{ belowMarginOnly=false; renderJobsTable(); };
+  } else {
+    bannerEl.style.display = 'none';
+  }
   const rows = allJobs
     .filter(j=> svc==='all' || j.serviceType===svc)
     .filter(j=> ctr==='all' || j.contractorName===ctr)
     .filter(j=> !q || j.jobRef.toLowerCase().includes(q) || j.contractorName.toLowerCase().includes(q))
+    .filter(j=> !belowMarginOnly || computeJobPayout(j).belowMinimumMargin)
     .sort((a,b)=> b.serviceDate.localeCompare(a.serviceDate));
 
   if(rows.length===0){
     $('jobsTbody').innerHTML = `<tr><td colspan="9" class="empty-state">No jobs match these filters.</td></tr>`;
+    updateExportJobsCount();
     return;
   }
   $('jobsTbody').innerHTML = rows.map(j=>{
@@ -749,6 +850,7 @@ function renderJobsTable(){
 
   document.querySelectorAll('.edit-job').forEach(b=> b.onclick = ()=> openJobModal(allJobs.find(j=>String(j.id)===b.dataset.id)));
   document.querySelectorAll('.del-job').forEach(b=> b.onclick = ()=> handleDeleteJob(b.dataset.id));
+  updateExportJobsCount();
 }
 
 function renderContractors(){
@@ -762,9 +864,12 @@ function renderContractors(){
   const rows = Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>b.payout-a.payout);
   if(rows.length===0){ $('contractorsTbody').innerHTML = `<tr><td colspan="6" class="empty-state">No contractors logged yet — add a job to get started.</td></tr>`; return; }
   $('contractorsTbody').innerHTML = rows.map((c,i)=>`
-    <tr><td class="rank-cell">${i===0?'🏆':i+1}</td><td>${escapeHtml(c.name)}</td>
+    <tr class="clickable-row" data-contractor="${escapeHtml(c.name)}"><td class="rank-cell">${i===0?'🏆':i+1}</td><td>${escapeHtml(c.name)}</td>
       <td class="num mono">${c.jobs}</td><td class="num mono">${fmt(c.revenue)}</td>
       <td class="num mono">${fmt(c.payout)}</td><td class="num mono">${fmt(c.margin)}</td></tr>`).join('');
+  document.querySelectorAll('#contractorsTbody tr[data-contractor]').forEach(tr=>{
+    tr.onclick = ()=> goToJobs({contractor: tr.dataset.contractor});
+  });
 }
 
 function renderRateCard(){
@@ -778,6 +883,145 @@ function renderRateCard(){
   $('rateAddonTbody').innerHTML = ADDON_DEFS.map(a=>`
     <tr><td>${a.label}</td>${bands5.map(b=>`<td class="num mono">$${b.addonRates[a.id]}</td>`).join('')}</tr>`).join('');
 }
+
+function freqLabel(f){ return {monthly:'Monthly', weekly:'Weekly', yearly:'Yearly', one_time:'One-time'}[f] || f; }
+
+function renderExpenses(){
+  const totalMonthly = computeMonthlyOperatingExpenses();
+  const activeCount = allExpenses.filter(e=>e.active).length;
+  const annualized = totalMonthly*12;
+  $('expenseStats').innerHTML = `
+    <div class="stat-card accent"><div class="stat-label">Monthly operating expenses</div><div class="stat-value mono">${fmt(totalMonthly)}</div><div class="stat-sub">${activeCount} active expense${activeCount===1?'':'s'}</div></div>
+    <div class="stat-card"><div class="stat-label">Annualized</div><div class="stat-value mono">${fmt(annualized)}</div><div class="stat-sub">monthly equivalent × 12</div></div>
+    <div class="stat-card"><div class="stat-label">Total logged</div><div class="stat-value mono">${allExpenses.length}</div><div class="stat-sub">including inactive</div></div>`;
+
+  if(allExpenses.length===0){
+    $('expensesTbody').innerHTML = `<tr><td colspan="7" class="empty-state">No expenses logged yet — add insurance, supplies, software, etc.</td></tr>`;
+    return;
+  }
+  const rows = [...allExpenses].sort((a,b)=> a.category.localeCompare(b.category));
+  $('expensesTbody').innerHTML = rows.map(e=>`
+    <tr data-id="${e.id}">
+      <td>${escapeHtml(e.category)}</td>
+      <td>${escapeHtml(e.description)}</td>
+      <td class="num mono">${fmt(e.amount)}</td>
+      <td>${freqLabel(e.frequency)}</td>
+      <td class="num mono">${fmt(monthlyEquivalent(e))}</td>
+      <td>${e.active ? `<span class="badge badge-ok">Active</span>` : `<span class="badge badge-outline">Inactive</span>`}</td>
+      <td style="text-align:right;">
+        <button class="icon-btn edit-expense" data-id="${e.id}">✎</button>
+        <button class="icon-btn del-expense" data-id="${e.id}">🗑</button>
+      </td>
+    </tr>`).join('');
+  document.querySelectorAll('.edit-expense').forEach(b=> b.onclick = ()=> openExpenseModal(allExpenses.find(e=>String(e.id)===b.dataset.id)));
+  document.querySelectorAll('.del-expense').forEach(b=> b.onclick = ()=> handleDeleteExpense(b.dataset.id));
+}
+
+let editingExpenseId = null;
+function openExpenseModal(expense){
+  editingExpenseId = expense ? expense.id : null;
+  $('expenseModalTitle').textContent = expense ? 'Edit expense' : 'Add expense';
+  $('eCategory').value = expense ? expense.category : '';
+  $('eDescription').value = expense ? expense.description : '';
+  $('eAmount').value = expense ? expense.amount : 0;
+  $('eFrequency').value = expense ? expense.frequency : 'monthly';
+  $('eStartDate').value = expense ? expense.startDate : new Date().toISOString().slice(0,10);
+  $('eActive').checked = expense ? expense.active : true;
+  $('expenseModalOverlay').classList.add('open');
+}
+function closeExpenseModal(){ $('expenseModalOverlay').classList.remove('open'); }
+$('expenseModalClose').onclick = closeExpenseModal;
+$('expenseModalCancel').onclick = closeExpenseModal;
+$('newExpenseBtn').onclick = ()=> openExpenseModal(null);
+
+$('expenseModalSave').onclick = async ()=>{
+  const category = $('eCategory').value.trim();
+  const amount = Number($('eAmount').value)||0;
+  if(!category){ toast('Enter a category'); return; }
+  const payload = {
+    category, description: $('eDescription').value.trim(), amount,
+    frequency: $('eFrequency').value, startDate: $('eStartDate').value || new Date().toISOString().slice(0,10),
+    active: $('eActive').checked,
+  };
+  $('expenseModalSave').disabled = true; $('expenseModalSave').textContent = 'Saving…';
+  try{
+    if(editingExpenseId){ await updateExpenseRow(editingExpenseId, payload); toast('Expense updated'); }
+    else { await createExpenseRow(payload); toast('Expense saved'); }
+    closeExpenseModal();
+    await reloadExpensesAndRender();
+  }catch(e){ toast(e.message || 'Could not save expense'); }
+  finally{ $('expenseModalSave').disabled = false; $('expenseModalSave').textContent = 'Save expense'; }
+};
+async function handleDeleteExpense(id){
+  if(!confirm('Delete this expense? This cannot be undone.')) return;
+  try{ await deleteExpenseRow(id); toast('Expense deleted'); await reloadExpensesAndRender(); }
+  catch(e){ toast(e.message || 'Could not delete expense'); }
+}
+async function reloadExpensesAndRender(){
+  allExpenses = await fetchExpenses();
+  renderExpenses();
+  renderOverview(); // operating expenses / net profit stats depend on this
+}
+
+/* ---------------- CSV export ---------------- */
+function downloadCsv(filename, rows){
+  const csv = rows.map(r => r.map(cell=>{
+    const s = String(cell==null?'':cell);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function currentFilteredJobs(){
+  const q = $('searchInput').value.trim().toLowerCase();
+  const svc = $('serviceFilter').value;
+  const ctr = $('contractorFilter').value;
+  return allJobs
+    .filter(j=> svc==='all' || j.serviceType===svc)
+    .filter(j=> ctr==='all' || j.contractorName===ctr)
+    .filter(j=> !q || j.jobRef.toLowerCase().includes(q) || j.contractorName.toLowerCase().includes(q))
+    .filter(j=> !belowMarginOnly || computeJobPayout(j).belowMinimumMargin)
+    .sort((a,b)=> b.serviceDate.localeCompare(a.serviceDate));
+}
+function updateExportJobsCount(){ const el=$('exportJobsCount'); if(el) el.textContent = currentFilteredJobs().length; }
+
+$('exportJobsBtn').onclick = ()=>{
+  const rows = currentFilteredJobs();
+  const header = ['Date','Job Ref','Contractor','Service','Home Size','Client Price','Base Payout','Add-ons Payout','Tier %','Tier Amount','Travel','Supplies','Total Payout','Margin','Source'];
+  const body = rows.map(j=>{
+    const r = computeJobPayout(j);
+    const svcLabel = (SERVICE_TYPES.find(s=>s.id===j.serviceType)||{}).label || j.serviceType;
+    return [j.serviceDate, j.jobRef, j.contractorName, svcLabel, getBand(j.homeSizeBand).label,
+      j.clientPrice.toFixed(2), r.basePayout.toFixed(2), r.addonsPayout.toFixed(2), r.tierPct, r.tierAmount.toFixed(2),
+      r.travelPremium.toFixed(2), r.supplyAllowance.toFixed(2), r.totalPayout.toFixed(2), r.margin.toFixed(2), j.source||'manual'];
+  });
+  downloadCsv(`one18-jobs-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
+  toast(`Exported ${rows.length} job${rows.length===1?'':'s'}`);
+};
+$('exportContractorsBtn').onclick = ()=>{
+  const map = {};
+  allJobs.forEach(j=>{
+    const r = computeJobPayout(j);
+    if(!map[j.contractorName]) map[j.contractorName] = {jobs:0, payout:0, revenue:0, margin:0};
+    map[j.contractorName].jobs++; map[j.contractorName].payout += r.totalPayout;
+    map[j.contractorName].revenue += j.clientPrice; map[j.contractorName].margin += r.margin;
+  });
+  const header = ['Contractor','Jobs','Revenue','Total Payout','Margin'];
+  const body = Object.entries(map).sort(([,a],[,b])=>b.payout-a.payout)
+    .map(([name,v])=>[name, v.jobs, v.revenue.toFixed(2), v.payout.toFixed(2), v.margin.toFixed(2)]);
+  downloadCsv(`one18-contractors-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
+  toast(`Exported ${body.length} contractor${body.length===1?'':'s'}`);
+};
+$('exportExpensesBtn').onclick = ()=>{
+  const header = ['Category','Description','Amount','Frequency','Start Date','Monthly Equivalent','Active'];
+  const body = allExpenses.map(e=>[e.category, e.description, e.amount.toFixed(2), freqLabel(e.frequency), e.startDate, monthlyEquivalent(e).toFixed(2), e.active?'Yes':'No']);
+  downloadCsv(`one18-expenses-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
+  toast(`Exported ${body.length} expense${body.length===1?'':'s'}`);
+};
 
 /* ---------------- Job modal ---------------- */
 let editingId = null;
@@ -948,11 +1192,12 @@ $('serviceFilter').addEventListener('change', renderJobsTable);
 $('contractorFilter').addEventListener('change', renderJobsTable);
 
 async function reloadAndRender(){
-  allJobs = await fetchJobs();
+  [allJobs, allExpenses] = await Promise.all([fetchJobs(), fetchExpenses()]);
   renderOverview();
   renderContractorFilterOptions();
   renderJobsTable();
   renderContractors();
+  renderExpenses();
 }
 
 /* ---------------- Login flow ---------------- */
