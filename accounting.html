@@ -340,6 +340,18 @@
   </section>
 </main>
 
+<!-- ===================== EXPORT CONFIRM MODAL ===================== -->
+<div class="modal-overlay" id="exportConfirmOverlay">
+  <div class="modal" style="max-width:400px;">
+    <h2 id="exportConfirmTitle">Export?</h2>
+    <p class="modal-sub" id="exportConfirmMessage" style="line-height:1.5;"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="exportConfirmCancel">Cancel</button>
+      <button class="btn btn-gold" id="exportConfirmGo">⬇ Confirm export</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== EXPENSE MODAL ===================== -->
 <div class="modal-overlay" id="expenseModalOverlay">
   <div class="modal" style="max-width:440px;">
@@ -755,6 +767,7 @@ function goBack(){ history.back(); }
 function closeScreen(id){
   if(id==='jobModal'){ closeJobModalUI(); }
   else if(id==='expenseModal'){ closeExpenseModalUI(); }
+  else if(id==='exportConfirmModal'){ closeExportConfirmUI(); }
   else { applyTabUI(navStack[navStack.length-1] || 'overview'); }
 }
 history.pushState({navDepth:navStack.length}, '');
@@ -1078,7 +1091,7 @@ function currentFilteredJobs(){
 }
 function updateExportJobsCount(){ const el=$('exportJobsCount'); if(el) el.textContent = currentFilteredJobs().length; }
 
-$('exportAllBtn').onclick = ()=>{
+function doExportAll(){
   const jobs = allJobs.map(j=>{
     const r = computeJobPayout(j);
     const svcLabel = (SERVICE_TYPES.find(s=>s.id===j.serviceType)||{}).label || j.serviceType;
@@ -1114,9 +1127,9 @@ $('exportAllBtn').onclick = ()=>{
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast(`Exported ${jobs.length} jobs, ${Object.keys(contractorMap).length} contractors, ${expenses.length} expenses`);
-};
+}
 
-$('exportJobsBtn').onclick = ()=>{
+function doExportJobs(){
   const rows = currentFilteredJobs();
   const header = ['Date','Job Ref','Contractor','Service','Home Size','Client Price','Base Payout','Add-ons Payout','Tier %','Tier Amount','Travel','Supplies','Total Payout','Margin','Source'];
   const body = rows.map(j=>{
@@ -1128,8 +1141,8 @@ $('exportJobsBtn').onclick = ()=>{
   });
   downloadCsv(`one18-jobs-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
   toast(`Exported ${rows.length} job${rows.length===1?'':'s'}`);
-};
-$('exportContractorsBtn').onclick = ()=>{
+}
+function doExportContractors(){
   const map = {};
   allJobs.forEach(j=>{
     const r = computeJobPayout(j);
@@ -1142,13 +1155,58 @@ $('exportContractorsBtn').onclick = ()=>{
     .map(([name,v])=>[name, v.jobs, v.revenue.toFixed(2), v.payout.toFixed(2), v.margin.toFixed(2)]);
   downloadCsv(`one18-contractors-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
   toast(`Exported ${body.length} contractor${body.length===1?'':'s'}`);
-};
-$('exportExpensesBtn').onclick = ()=>{
+}
+function doExportExpenses(){
   const header = ['Category','Description','Amount','Frequency','Spread (months)','Start Date','Monthly Equivalent','Active'];
   const body = allExpenses.map(e=>[e.category, e.description, e.amount.toFixed(2), freqLabel(e.frequency, e), e.spreadMonths||'', e.startDate, monthlyEquivalent(e).toFixed(2), e.active?'Yes':'No']);
   downloadCsv(`one18-expenses-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
   toast(`Exported ${body.length} expense${body.length===1?'':'s'}`);
+}
+
+/* ---------------- Export confirmation ---------------- */
+let pendingExportFn = null;
+function openExportConfirm(title, message, fn){
+  pendingExportFn = fn;
+  $('exportConfirmTitle').textContent = title;
+  $('exportConfirmMessage').innerHTML = message;
+  $('exportConfirmOverlay').classList.add('open');
+  navPush('exportConfirmModal');
+}
+function closeExportConfirmUI(){ $('exportConfirmOverlay').classList.remove('open'); pendingExportFn = null; }
+function closeExportConfirmModal(){ goBack(); }
+$('exportConfirmCancel').onclick = closeExportConfirmModal;
+$('exportConfirmOverlay').addEventListener('click', e=>{ if(e.target.id==='exportConfirmOverlay') closeExportConfirmModal(); });
+$('exportConfirmGo').onclick = ()=>{
+  const fn = pendingExportFn;
+  closeExportConfirmModal();
+  if(fn) fn();
 };
+
+function contractorCount(){ return new Set(allJobs.map(j=>j.contractorName)).size; }
+
+$('exportAllBtn').onclick = ()=> openExportConfirm(
+  'Export everything?',
+  `This downloads a <strong>full JSON backup</strong> — all <strong>${allJobs.length}</strong> job${allJobs.length===1?'':'s'}, <strong>${contractorCount()}</strong> contractor${contractorCount()===1?'':'s'}, and <strong>${allExpenses.length}</strong> expense${allExpenses.length===1?'':'s'} — regardless of any filters.`,
+  doExportAll
+);
+$('exportJobsBtn').onclick = ()=>{
+  const n = currentFilteredJobs().length;
+  openExportConfirm(
+    'Export jobs?',
+    `This downloads a CSV of <strong>${n}</strong> job${n===1?'':'s'} matching your current Jobs tab filters.`,
+    doExportJobs
+  );
+};
+$('exportContractorsBtn').onclick = ()=> openExportConfirm(
+  'Export contractor summary?',
+  `This downloads a CSV with one row per contractor (<strong>${contractorCount()}</strong> total) — job counts, revenue, payout, and margin.`,
+  doExportContractors
+);
+$('exportExpensesBtn').onclick = ()=> openExportConfirm(
+  'Export expenses?',
+  `This downloads a CSV of all <strong>${allExpenses.length}</strong> logged expense${allExpenses.length===1?'':'s'}, active and inactive.`,
+  doExportExpenses
+);
 
 /* ---------------- Job modal ---------------- */
 let editingId = null;
