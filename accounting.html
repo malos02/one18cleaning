@@ -317,6 +317,11 @@
   <section class="panel" id="panel-export">
     <div class="section-head"><div><div class="eyebrow">Data</div><h1>Export accounting data</h1></div></div>
     <p class="lede">Exports respect the Jobs tab's current filters (search, service, contractor). Files download as CSV, ready for Excel, Sheets, or your accountant.</p>
+    <div class="card" style="border-color:var(--gold);">
+      <h3>Export everything <span class="badge badge-outline">Full backup</span></h3>
+      <p class="lede" style="margin-bottom:12px;">A single JSON file with every job (unfiltered, all fields), every contractor, and every expense — the complete admin dataset, useful for backups or migrating records. This ignores the Jobs tab filters.</p>
+      <button class="btn btn-gold" id="exportAllBtn">⬇ Export all data (JSON)</button>
+    </div>
     <div class="card">
       <h3>Jobs export</h3>
       <p class="lede" style="margin-bottom:12px;">Exports the jobs currently matching your Jobs tab filters (<span id="exportJobsCount">0</span> job(s)).</p>
@@ -1072,6 +1077,44 @@ function currentFilteredJobs(){
     .sort((a,b)=> b.serviceDate.localeCompare(a.serviceDate));
 }
 function updateExportJobsCount(){ const el=$('exportJobsCount'); if(el) el.textContent = currentFilteredJobs().length; }
+
+$('exportAllBtn').onclick = ()=>{
+  const jobs = allJobs.map(j=>{
+    const r = computeJobPayout(j);
+    const svcLabel = (SERVICE_TYPES.find(s=>s.id===j.serviceType)||{}).label || j.serviceType;
+    return {
+      id:j.id, jobRef:j.jobRef, serviceDate:j.serviceDate, contractorName:j.contractorName,
+      serviceType:j.serviceType, serviceTypeLabel:svcLabel, homeSizeBand:j.homeSizeBand,
+      clientPrice:j.clientPrice, basePayout:r.basePayout, addons:j.addons, addonsPayout:r.addonsPayout,
+      tier:j.tier, tierPct:r.tierPct, tierAmount:r.tierAmount, travelPremium:r.travelPremium,
+      supplyAllowance:r.supplyAllowance, twoPerson:j.twoPerson, splitPct:j.splitPct,
+      totalPayout:r.totalPayout, margin:r.margin, belowMinimumMargin:r.belowMinimumMargin,
+      source:j.source||'manual', externalId:j.externalId||null,
+    };
+  });
+  const contractorMap = {};
+  allJobs.forEach(j=>{
+    const r = computeJobPayout(j);
+    if(!contractorMap[j.contractorName]) contractorMap[j.contractorName] = {name:j.contractorName, jobs:0, revenue:0, payout:0, margin:0};
+    const c = contractorMap[j.contractorName];
+    c.jobs++; c.revenue += j.clientPrice; c.payout += r.totalPayout; c.margin += r.margin;
+  });
+  const expenses = allExpenses.map(e=>({ ...e, monthlyEquivalent: monthlyEquivalent(e) }));
+
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    exportedBy: session.email,
+    summary: { jobCount: jobs.length, contractorCount: Object.keys(contractorMap).length, expenseCount: expenses.length },
+    jobs, contractors: Object.values(contractorMap), expenses,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `one18-full-export-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`Exported ${jobs.length} jobs, ${Object.keys(contractorMap).length} contractors, ${expenses.length} expenses`);
+};
 
 $('exportJobsBtn').onclick = ()=>{
   const rows = currentFilteredJobs();
