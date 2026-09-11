@@ -214,6 +214,8 @@
 <main>
   <div class="tabs">
     <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="monthly">Monthly</button>
+    <button class="tab-btn" data-tab="ledger">Ledger</button>
     <button class="tab-btn" data-tab="jobs">Jobs</button>
     <button class="tab-btn" data-tab="rateCard">Rate card</button>
     <button class="tab-btn" data-tab="contractors">Contractors</button>
@@ -239,6 +241,32 @@
       <h3>Revenue vs. contractor payout</h3>
       <div class="chart-wrap" id="trendChart"></div>
     </div>
+  </section>
+
+  <!-- ===================== MONTHLY ===================== -->
+  <section class="panel" id="panel-monthly">
+    <div class="section-head">
+      <div><div class="eyebrow">History</div><h1>Monthly financial statements</h1></div>
+      <button class="btn btn-primary" id="exportMonthlyBtn">⬇ Export (CSV)</button>
+    </div>
+    <p class="lede">Every month you've had job activity, broken down like a mini income statement — revenue, contractor payouts, gross margin, operating expenses, and net profit.</p>
+    <div class="stat-grid stat-grid-3" id="monthlySummaryStats"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Payout</th><th class="num">Margin</th><th class="num">Op. expenses</th><th class="num">Net profit</th></tr></thead>
+      <tbody id="monthlyTbody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================== LEDGER ===================== -->
+  <section class="panel" id="panel-ledger">
+    <div class="section-head">
+      <div><div class="eyebrow">Books of record</div><h1>Closed monthly ledger</h1></div>
+    </div>
+    <p class="lede">Each finished month is closed and locked here automatically the first time the dashboard is opened after that month ends — its numbers stay frozen even if you later edit an old job. Unlock a month only if you need to correct something, then re-close it to refresh and re-lock its numbers.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Payout</th><th class="num">Margin</th><th class="num">Op. expenses</th><th class="num">Net profit</th><th>Status</th><th></th></tr></thead>
+      <tbody id="ledgerTbody"></tbody>
+    </table></div>
   </section>
 
   <!-- ===================== JOBS ===================== -->
@@ -650,27 +678,136 @@ async function deleteExpenseRow(id){
 }
 
 /* Normalize any expense to its monthly-equivalent cost */
-function monthlyEquivalent(e){
+function monthlyEquivalent(e, refDate){
+  const now = refDate || new Date();
   if(e.frequency==='monthly') return e.amount;
   if(e.frequency==='weekly') return e.amount * (52/12);
   if(e.frequency==='yearly') return e.amount / 12;
   if(e.frequency==='one_time'){
     // Count a one-time expense only in the month it was incurred
     const sd = new Date(e.startDate+'T00:00:00');
-    const now = new Date();
     return (sd.getFullYear()===now.getFullYear() && sd.getMonth()===now.getMonth()) ? e.amount : 0;
   }
   if(e.frequency==='lump_sum'){
     const months = Math.max(1, e.spreadMonths||1);
     const sd = new Date(e.startDate+'T00:00:00');
-    const now = new Date();
     const monthsElapsed = (now.getFullYear()-sd.getFullYear())*12 + (now.getMonth()-sd.getMonth());
     return (monthsElapsed>=0 && monthsElapsed<months) ? e.amount/months : 0;
   }
   return 0;
 }
-function computeMonthlyOperatingExpenses(){
-  return allExpenses.filter(e=>e.active).reduce((s,e)=> s+monthlyEquivalent(e), 0);
+function computeMonthlyOperatingExpenses(refDate){
+  return allExpenses.filter(e=>e.active).reduce((s,e)=> s+monthlyEquivalent(e, refDate), 0);
+}
+
+/* =========================================================================
+   LEDGER — closed, locked monthly financial statements
+   ========================================================================= */
+let allLedgerEntries = [];
+
+async function fetchLedger(){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_ledger?select=*&order=month_key.desc`, { headers: authHeaders() });
+  if(!res.ok) throw new Error('Failed to load ledger: '+res.status);
+  return await res.json();
+}
+async function upsertLedgerEntry(row){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_ledger`, {
+    method:'POST', headers:{...authHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'}, body: JSON.stringify(row),
+  });
+  if(!res.ok) throw new Error('Failed to save ledger entry: '+res.status);
+}
+async function patchLedgerEntry(monthKey, patch){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_ledger?month_key=eq.${encodeURIComponent(monthKey)}`, {
+    method:'PATCH', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify({...patch, updated_at:new Date().toISOString()}),
+  });
+  if(!res.ok) throw new Error('Failed to update ledger entry: '+res.status);
+}
+
+/* Close (lock) a given month using current job/expense data */
+async function closeMonth(monthKey, statement){
+  await upsertLedgerEntry({
+    month_key: monthKey, label: statement.label, jobs_count: statement.jobs,
+    revenue: statement.revenue, payout: statement.payout, margin: statement.margin,
+    op_ex: statement.opEx, net_profit: statement.netProfit,
+    status:'locked', locked_at: new Date().toISOString(), locked_by: session.email,
+    unlocked_at:null, unlocked_by:null,
+  });
+}
+
+/* On load: automatically close any past month that has job history but has never
+   been locked in the ledger. Months a user explicitly unlocked are left alone —
+   those wait for a deliberate re-close, not silent auto re-locking. */
+async function autoCloseCompletedMonths(){
+  const statements = buildMonthlyStatements();
+  const currentKey = new Date().toISOString().slice(0,7);
+  const existingKeys = new Set(allLedgerEntries.map(e=>e.month_key));
+  const toClose = statements.filter(s=> s.monthKey < currentKey && !existingKeys.has(s.monthKey));
+  for(const s of toClose){ await closeMonth(s.monthKey, s); }
+  if(toClose.length){ allLedgerEntries = await fetchLedger(); }
+}
+
+function renderLedger(){
+  if(allLedgerEntries.length===0){
+    $('ledgerTbody').innerHTML = `<tr><td colspan="9" class="empty-state">No months closed yet — the first completed month locks in automatically next time this dashboard is opened.</td></tr>`;
+    return;
+  }
+  $('ledgerTbody').innerHTML = allLedgerEntries.map(e=>{
+    const locked = e.status==='locked';
+    return `<tr>
+      <td>${escapeHtml(e.label)}</td>
+      <td class="num mono">${e.jobs_count}</td>
+      <td class="num mono">${fmt(e.revenue)}</td>
+      <td class="num mono">${fmt(e.payout)}</td>
+      <td class="num mono">${fmt(e.margin)}</td>
+      <td class="num mono">${fmt(e.op_ex)}</td>
+      <td class="num mono" style="color:${e.net_profit<0?'var(--warn)':'inherit'};">${fmt(e.net_profit)}</td>
+      <td>${locked ? `<span class="badge badge-ok">🔒 Locked</span>` : `<span class="badge badge-warn">🔓 Unlocked</span>`}</td>
+      <td style="text-align:right;">
+        ${locked
+          ? `<button class="icon-btn unlock-month" data-month="${e.month_key}">Unlock</button>`
+          : `<button class="icon-btn reclose-month" data-month="${e.month_key}">Re-close</button>`}
+      </td>
+    </tr>`;
+  }).join('');
+  document.querySelectorAll('.unlock-month').forEach(b=> b.onclick = ()=> handleUnlockMonth(b.dataset.month));
+  document.querySelectorAll('.reclose-month').forEach(b=> b.onclick = ()=> handleRecloseMonth(b.dataset.month));
+}
+
+function handleUnlockMonth(monthKey){
+  const entry = allLedgerEntries.find(e=>e.month_key===monthKey);
+  if(!entry) return;
+  openExportConfirm(
+    `Unlock ${entry.label}?`,
+    `This unfreezes ${escapeHtml(entry.label)}'s ledger entry so you can go fix the underlying job or expense data. Its numbers stay visible but marked <strong>Unlocked</strong> until you re-close it.`,
+    async ()=>{
+      try{
+        await patchLedgerEntry(monthKey, {status:'unlocked', unlocked_at:new Date().toISOString(), unlocked_by:session.email});
+        toast(`${entry.label} unlocked`);
+        allLedgerEntries = await fetchLedger();
+        renderLedger();
+      }catch(e){ toast(e.message || 'Could not unlock month'); }
+    },
+    '🔓 Confirm unlock'
+  );
+}
+function handleRecloseMonth(monthKey){
+  const entry = allLedgerEntries.find(e=>e.month_key===monthKey);
+  if(!entry) return;
+  const fresh = buildMonthlyStatements().find(s=>s.monthKey===monthKey);
+  if(!fresh){ toast('No job data found for that month'); return; }
+  openExportConfirm(
+    `Re-close ${entry.label}?`,
+    `This recalculates ${escapeHtml(entry.label)} from current job and expense data and locks it again. New net profit will be <strong>${fmt(fresh.netProfit)}</strong> (was ${fmt(entry.net_profit)}).`,
+    async ()=>{
+      try{
+        await closeMonth(monthKey, fresh);
+        toast(`${entry.label} re-closed`);
+        allLedgerEntries = await fetchLedger();
+        renderLedger();
+      }catch(e){ toast(e.message || 'Could not re-close month'); }
+    },
+    '🔒 Confirm re-close'
+  );
 }
 
 /* ---------------- Sync from the field app's jobs/contractors tables ---------------- */
@@ -886,6 +1023,70 @@ function renderOverview(){
     </div>`;
 }
 
+function buildMonthlyStatements(){
+  const byMonth = {};
+  allJobs.forEach(j=>{
+    const r = computeJobPayout(j);
+    const mk = j.serviceDate.slice(0,7); // YYYY-MM
+    if(!byMonth[mk]) byMonth[mk] = {jobs:0, revenue:0, payout:0, margin:0};
+    const m = byMonth[mk];
+    m.jobs++; m.revenue += j.clientPrice; m.payout += r.totalPayout; m.margin += r.margin;
+  });
+  return Object.entries(byMonth).sort(([a],[b])=>b.localeCompare(a)).map(([mk,v])=>{
+    const [y,mo] = mk.split('-').map(Number);
+    const refDate = new Date(y, mo-1, 1);
+    const opEx = computeMonthlyOperatingExpenses(refDate);
+    return {
+      monthKey:mk, label: refDate.toLocaleDateString(undefined,{month:'long', year:'numeric'}),
+      jobs:v.jobs, revenue:v.revenue, payout:v.payout, margin:v.margin,
+      opEx, netProfit: v.margin - opEx,
+    };
+  });
+}
+
+function renderMonthlyTrack(){
+  const rows = buildMonthlyStatements();
+  if(rows.length===0){
+    $('monthlySummaryStats').innerHTML = '';
+    $('monthlyTbody').innerHTML = `<tr><td colspan="7" class="empty-state">No job history yet — statements appear as jobs are logged.</td></tr>`;
+    return;
+  }
+  const lifetimeRevenue = rows.reduce((s,r)=>s+r.revenue,0);
+  const lifetimeNet = rows.reduce((s,r)=>s+r.netProfit,0);
+  const avgNet = lifetimeNet / rows.length;
+  $('monthlySummaryStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Lifetime revenue</div><div class="stat-value mono">${fmt(lifetimeRevenue)}</div><div class="stat-sub">${rows.length} month${rows.length===1?'':'s'} of activity</div></div>
+    <div class="stat-card"><div class="stat-label">Lifetime net profit</div><div class="stat-value mono" style="color:${lifetimeNet<0?'var(--warn)':'var(--navy)'};">${fmt(lifetimeNet)}</div><div class="stat-sub">after operating expenses</div></div>
+    <div class="stat-card accent"><div class="stat-label">Avg. monthly net profit</div><div class="stat-value mono" style="color:${avgNet<0?'var(--warn)':'var(--navy)'};">${fmt(avgNet)}</div><div class="stat-sub">across all logged months</div></div>`;
+
+  $('monthlyTbody').innerHTML = rows.map(r=>`
+    <tr>
+      <td>${r.label}</td>
+      <td class="num mono">${r.jobs}</td>
+      <td class="num mono">${fmt(r.revenue)}</td>
+      <td class="num mono">${fmt(r.payout)}</td>
+      <td class="num mono">${fmt(r.margin)}</td>
+      <td class="num mono">${fmt(r.opEx)}</td>
+      <td class="num mono" style="color:${r.netProfit<0?'var(--warn)':'inherit'};">${fmt(r.netProfit)}</td>
+    </tr>`).join('');
+}
+
+function doExportMonthly(){
+  const rows = buildMonthlyStatements();
+  const header = ['Month','Jobs','Revenue','Contractor Payout','Gross Margin','Operating Expenses','Net Profit'];
+  const body = rows.map(r=>[r.label, r.jobs, r.revenue.toFixed(2), r.payout.toFixed(2), r.margin.toFixed(2), r.opEx.toFixed(2), r.netProfit.toFixed(2)]);
+  downloadCsv(`one18-monthly-statements-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
+  toast(`Exported ${body.length} month${body.length===1?'':'s'}`);
+}
+$('exportMonthlyBtn').onclick = ()=>{
+  const n = buildMonthlyStatements().length;
+  openExportConfirm(
+    'Export monthly statements?',
+    `This downloads a CSV with one row per month (<strong>${n}</strong> total) — revenue, payout, margin, operating expenses, and net profit.`,
+    doExportMonthly
+  );
+};
+
 function renderContractorFilterOptions(){
   const names = Array.from(new Set(allJobs.map(j=>j.contractorName))).sort();
   const sel = $('contractorFilter');
@@ -1063,6 +1264,7 @@ async function reloadExpensesAndRender(){
   allExpenses = await fetchExpenses();
   renderExpenses();
   renderOverview(); // operating expenses / net profit stats depend on this
+  renderMonthlyTrack();
 }
 
 /* ---------------- CSV export ---------------- */
@@ -1165,10 +1367,11 @@ function doExportExpenses(){
 
 /* ---------------- Export confirmation ---------------- */
 let pendingExportFn = null;
-function openExportConfirm(title, message, fn){
+function openExportConfirm(title, message, fn, confirmLabel){
   pendingExportFn = fn;
   $('exportConfirmTitle').textContent = title;
   $('exportConfirmMessage').innerHTML = message;
+  $('exportConfirmGo').textContent = confirmLabel || '⬇ Confirm export';
   $('exportConfirmOverlay').classList.add('open');
   navPush('exportConfirmModal');
 }
@@ -1380,7 +1583,11 @@ $('contractorFilter').addEventListener('change', renderJobsTable);
 
 async function reloadAndRender(){
   [allJobs, allExpenses] = await Promise.all([fetchJobs(), fetchExpenses()]);
+  allLedgerEntries = await fetchLedger();
+  await autoCloseCompletedMonths();
   renderOverview();
+  renderMonthlyTrack();
+  renderLedger();
   renderContractorFilterOptions();
   renderJobsTable();
   renderContractors();
