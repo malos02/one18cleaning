@@ -252,7 +252,7 @@
     <p class="lede">Every month you've had job activity, broken down like a mini income statement — revenue, contractor payouts, gross margin, operating expenses, and net profit.</p>
     <div class="stat-grid stat-grid-3" id="monthlySummaryStats"></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Payout</th><th class="num">Margin</th><th class="num">Op. expenses</th><th class="num">Net profit</th></tr></thead>
+      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Payout</th><th class="num">Gross profit</th><th class="num">Op. expenses</th><th class="num">Net profit</th></tr></thead>
       <tbody id="monthlyTbody"></tbody>
     </table></div>
   </section>
@@ -264,7 +264,7 @@
     </div>
     <p class="lede">Each finished month is closed and locked here automatically the first time the dashboard is opened after that month ends — its numbers stay frozen even if you later edit an old job. Unlock a month only if you need to correct something, then re-close it to refresh and re-lock its numbers.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Payout</th><th class="num">Margin</th><th class="num">Op. expenses</th><th class="num">Net profit</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Month</th><th class="num">Jobs</th><th class="num">Revenue</th><th class="num">Payout</th><th class="num">Gross profit</th><th class="num">Op. expenses</th><th class="num">Net profit</th><th>Status</th><th></th></tr></thead>
       <tbody id="ledgerTbody"></tbody>
     </table></div>
   </section>
@@ -336,7 +336,7 @@
     <p class="lede">Recurring and one-time business costs — insurance, supplies, software, etc. Recurring amounts are normalized to a monthly figure and rolled into the Overview's operating expense and net profit stats.</p>
     <div class="stat-grid stat-grid-3" id="expenseStats"></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Category</th><th>Description</th><th class="num">Amount</th><th>Frequency</th><th class="num">Monthly equiv.</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Category</th><th>Description</th><th class="num">Amount</th><th>Frequency</th><th class="num">Monthly equiv.</th><th>Status</th><th>Receipt</th><th></th></tr></thead>
       <tbody id="expensesTbody"></tbody>
     </table></div>
   </section>
@@ -406,6 +406,14 @@
     </div>
     <div class="field"><label>Start date</label><input type="date" id="eStartDate"></div>
     <div class="switch-row"><input type="checkbox" id="eActive" checked> <span>Active (included in current totals)</span></div>
+    <div class="field">
+      <label>Receipt <span class="hint-inline">(optional — photo or PDF)</span></label>
+      <input type="file" id="eReceiptFile" accept="image/*,.pdf" capture="environment">
+      <div id="eReceiptCurrent" style="display:none; margin-top:8px; padding:8px 10px; background:var(--paper); border:1px solid var(--line); border-radius:8px; font-size:12.5px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <a href="#" id="eReceiptLink" target="_blank" style="color:var(--gold); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📎 <span id="eReceiptName"></span></a>
+        <button type="button" class="icon-btn" id="eReceiptRemove" style="flex:none;">Remove</button>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="expenseModalCancel">Cancel</button>
       <button class="btn btn-primary" id="expenseModalSave">Save expense</button>
@@ -478,6 +486,7 @@
    ========================================================================= */
 const SUPABASE_URL = 'https://qbicdeyirtvavlkrarcy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_pvN11J0EDjEVsuCvXHVung_3Eh2VjVj';
+const SEND_EMAIL_SECRET = 'X0cepGsPAJgA6FRU2f7PMHcw3BEV3yYjTpLiv48SzOg';
 const ADMIN_EMAILS = ['one18cleaning@gmail.com'];
 const SESSION_KEY = 'one18_accounting_session';
 
@@ -659,10 +668,11 @@ async function fetchExpenses(){
   return rows.map(r=>({
     id:r.id, category:r.category, description:r.description||'', amount:Number(r.amount),
     frequency:r.frequency, startDate:r.start_date, active:r.active, spreadMonths:r.spread_months||null,
+    receiptPath:r.receipt_path||null, receiptFilename:r.receipt_filename||null,
   }));
 }
 function expenseToRow(e){
-  return { category:e.category, description:e.description, amount:e.amount, frequency:e.frequency, start_date:e.startDate, active:e.active, spread_months:e.spreadMonths||null, updated_at:new Date().toISOString() };
+  return { category:e.category, description:e.description, amount:e.amount, frequency:e.frequency, start_date:e.startDate, active:e.active, spread_months:e.spreadMonths||null, receipt_path:e.receiptPath||null, receipt_filename:e.receiptFilename||null, updated_at:new Date().toISOString() };
 }
 async function createExpenseRow(e){
   const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses`, { method:'POST', headers:{...authHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify(expenseToRow(e)) });
@@ -675,6 +685,118 @@ async function updateExpenseRow(id, e){
 async function deleteExpenseRow(id){
   const res = await fetch(`${SUPABASE_URL}/rest/v1/accounting_expenses?id=eq.${encodeURIComponent(id)}`, { method:'DELETE', headers: authHeaders() });
   if(!res.ok) throw new Error('Failed to delete expense: '+res.status);
+}
+
+/* ---------------- Receipt storage (expense-receipts bucket) ---------------- */
+const RECEIPT_BUCKET = 'expense-receipts';
+async function uploadReceiptFile(file){
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const path = `${Date.now()}-${safeName}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${RECEIPT_BUCKET}/${encodeURIComponent(path)}`, {
+    method:'POST',
+    headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${session.access_token}`, 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  if(!res.ok) throw new Error('Receipt upload failed: '+res.status);
+  return { path, filename: file.name };
+}
+async function getReceiptSignedUrl(path){
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${RECEIPT_BUCKET}/${encodeURIComponent(path)}`, {
+    method:'POST', headers:{...authHeaders()}, body: JSON.stringify({expiresIn: 300}),
+  });
+  if(!res.ok) throw new Error('Could not open receipt: '+res.status);
+  const body = await res.json();
+  return `${SUPABASE_URL}/storage/v1${body.signedURL}`;
+}
+async function deleteReceiptFile(path){
+  if(!path) return;
+  try{
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${RECEIPT_BUCKET}/${encodeURIComponent(path)}`, { method:'DELETE', headers: authHeaders() });
+  }catch(e){ /* best-effort cleanup, don't block the UI on this */ }
+}
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=> resolve(String(r.result).split(',')[1] || '');
+    r.onerror = ()=> reject(new Error('Could not read file'));
+    r.readAsDataURL(file);
+  });
+}
+
+/* Fire-and-forget: notify the admin inbox whenever a new expense is logged */
+function diffExpenseFields(prev, next, receiptChanged){
+  const changes = [];
+  const push = (label, oldVal, newVal)=>{ if(String(oldVal)!==String(newVal)) changes.push({label, oldVal, newVal}); };
+  push('Category', prev.category, next.category);
+  push('Description', prev.description||'(none)', next.description||'(none)');
+  push('Amount', fmt(prev.amount), fmt(next.amount));
+  push('Frequency', freqLabel(prev.frequency, prev), freqLabel(next.frequency, next));
+  push('Start date', prev.startDate, next.startDate);
+  push('Status', prev.active?'Active':'Inactive', next.active?'Active':'Inactive');
+  if(receiptChanged) changes.push({label:'Receipt', oldVal: prev.receiptFilename||'(none)', newVal: next.receiptFilename||'(none)'});
+  return changes;
+}
+
+async function sendExpenseNotificationEmail(expense, receiptFile, opts){
+  const action = (opts && opts.action) || 'created';
+  const previous = opts && opts.previous;
+  try{
+    const attachments = [];
+    const RECEIPT_EMAIL_SIZE_CAP = 5 * 1024 * 1024; // 5MB — keep the email payload reasonable
+    let receiptTooLarge = false;
+    if(receiptFile){
+      if(receiptFile.size <= RECEIPT_EMAIL_SIZE_CAP){
+        const b64 = await fileToBase64(receiptFile);
+        attachments.push({ filename: receiptFile.name, content: b64, contentType: receiptFile.type || 'application/octet-stream' });
+      } else {
+        receiptTooLarge = true;
+      }
+    }
+    const isEdit = action==='updated';
+    const changes = isEdit ? diffExpenseFields(previous, expense, !!receiptFile || (opts && opts.receiptRemoved)) : [];
+    const changesHtml = isEdit
+      ? (changes.length
+          ? `<div style="background:#fff; border:1.5px solid #E4DCCB; border-radius:12px; padding:20px 24px; margin-bottom:16px;">
+               <div style="font-size:12px; color:#6B7A8C; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px;">What changed</div>
+               ${changes.map(c=>`<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">${c.label}: </span>${escapeHtml(String(c.oldVal))} → <strong>${escapeHtml(String(c.newVal))}</strong></div>`).join('')}
+             </div>`
+          : `<div style="background:#fff; border:1.5px solid #E4DCCB; border-radius:12px; padding:16px 20px; margin-bottom:16px; color:#6B7A8C; font-size:13px;">No field values changed.</div>`)
+      : '';
+    const html = `
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif; max-width:520px; margin:0 auto; color:#20303F;">
+        <div style="background:#16283F; padding:28px 24px; text-align:center;">
+          <div style="color:#C79A5D; font-size:22px; font-weight:700; letter-spacing:0.05em;">ONE:18 CLEANING</div>
+          <div style="color:rgba(255,255,255,0.7); font-size:12px; margin-top:4px; letter-spacing:0.1em;">ACCOUNTING — EXPENSE ${isEdit?'EDITED':'LOGGED'}</div>
+        </div>
+        <div style="padding:32px 24px; background:#FAF6EE;">
+          ${changesHtml}
+          <div style="background:#fff; border:1.5px solid #E4DCCB; border-radius:12px; padding:20px 24px; margin-bottom:16px;">
+            <div style="font-size:12px; color:#6B7A8C; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px;">${isEdit ? 'Current expense details' : 'Expense details'}</div>
+            <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Category: </span><strong>${escapeHtml(expense.category)}</strong></div>
+            ${expense.description ? `<div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Description: </span>${escapeHtml(expense.description)}</div>` : ''}
+            <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Amount: </span><strong>${fmt(expense.amount)}</strong></div>
+            <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Frequency: </span>${freqLabel(expense.frequency, expense)}</div>
+            <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Start date: </span>${expense.startDate}</div>
+            <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Monthly equivalent: </span><strong>${fmt(monthlyEquivalent(expense))}</strong></div>
+            <div style="margin-bottom:8px;"><span style="color:#6B7A8C;">Status: </span>${expense.active ? 'Active' : 'Inactive'}</div>
+            <div><span style="color:#6B7A8C;">Receipt: </span>${receiptFile ? (receiptTooLarge ? `Too large to email (${escapeHtml(receiptFile.name)}) — view it in the dashboard` : `Attached (${escapeHtml(receiptFile.name)})`) : (expense.receiptFilename ? `On file (${escapeHtml(expense.receiptFilename)}) — view it in the dashboard` : 'None attached')}</div>
+          </div>
+          <p style="margin:0; font-size:13px; color:#6B7A8C;">${isEdit?'Edited':'Logged'} by ${escapeHtml(session.email)} in the One:18 accounting dashboard.</p>
+        </div>
+        <div style="background:#16283F; padding:16px 24px; text-align:center;">
+          <div style="color:rgba(255,255,255,0.5); font-size:11px;">One:18 Cleaning • Cleaning With Purpose • Greater Houston Area</div>
+        </div>
+      </div>`;
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        secret: SEND_EMAIL_SECRET, to: ADMIN_EMAILS[0],
+        subject: `One:18 Accounting — Expense ${isEdit?'edited':'logged'}: ${expense.category} (${fmt(expense.amount)})`,
+        html, attachments,
+      }),
+    });
+  }catch(e){ console.error('Expense notification email failed:', e); }
 }
 
 /* Normalize any expense to its monthly-equivalent cost */
@@ -1073,7 +1195,7 @@ function renderMonthlyTrack(){
 
 function doExportMonthly(){
   const rows = buildMonthlyStatements();
-  const header = ['Month','Jobs','Revenue','Contractor Payout','Gross Margin','Operating Expenses','Net Profit'];
+  const header = ['Month','Jobs','Revenue','Contractor Payout','Gross Profit','Operating Expenses','Net Profit'];
   const body = rows.map(r=>[r.label, r.jobs, r.revenue.toFixed(2), r.payout.toFixed(2), r.margin.toFixed(2), r.opEx.toFixed(2), r.netProfit.toFixed(2)]);
   downloadCsv(`one18-monthly-statements-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
   toast(`Exported ${body.length} month${body.length===1?'':'s'}`);
@@ -1192,7 +1314,7 @@ function renderExpenses(){
     <div class="stat-card"><div class="stat-label">Total logged</div><div class="stat-value mono">${allExpenses.length}</div><div class="stat-sub">including inactive</div></div>`;
 
   if(allExpenses.length===0){
-    $('expensesTbody').innerHTML = `<tr><td colspan="7" class="empty-state">No expenses logged yet — add insurance, supplies, software, etc.</td></tr>`;
+    $('expensesTbody').innerHTML = `<tr><td colspan="8" class="empty-state">No expenses logged yet — add insurance, supplies, software, etc.</td></tr>`;
     return;
   }
   const rows = [...allExpenses].sort((a,b)=> a.category.localeCompare(b.category));
@@ -1204,6 +1326,7 @@ function renderExpenses(){
       <td>${freqLabel(e.frequency, e)}</td>
       <td class="num mono">${fmt(monthlyEquivalent(e))}</td>
       <td>${e.active ? `<span class="badge badge-ok">Active</span>` : `<span class="badge badge-outline">Inactive</span>`}</td>
+      <td>${e.receiptPath ? `<a href="#" class="view-receipt" data-id="${e.id}" style="color:var(--gold);">📎 View</a>` : `<span style="color:var(--muted);">—</span>`}</td>
       <td style="text-align:right;">
         <button class="icon-btn edit-expense" data-id="${e.id}">✎</button>
         <button class="icon-btn del-expense" data-id="${e.id}">🗑</button>
@@ -1211,9 +1334,43 @@ function renderExpenses(){
     </tr>`).join('');
   document.querySelectorAll('.edit-expense').forEach(b=> b.onclick = ()=> openExpenseModal(allExpenses.find(e=>String(e.id)===b.dataset.id)));
   document.querySelectorAll('.del-expense').forEach(b=> b.onclick = ()=> handleDeleteExpense(b.dataset.id));
+  document.querySelectorAll('.view-receipt').forEach(b=> b.onclick = async (e)=>{
+    e.preventDefault();
+    const exp = allExpenses.find(x=>String(x.id)===b.dataset.id);
+    if(!exp || !exp.receiptPath) return;
+    try{ const url = await getReceiptSignedUrl(exp.receiptPath); window.open(url, '_blank'); }
+    catch(err){ toast(err.message || 'Could not open receipt'); }
+  });
 }
 
 let editingExpenseId = null;
+let pendingReceipt = {path:null, filename:null, removed:false};
+function updateReceiptUI(){
+  const fileChosen = $('eReceiptFile').files[0];
+  if(fileChosen){
+    $('eReceiptCurrent').style.display='flex';
+    $('eReceiptName').textContent = fileChosen.name + ' (new — will attach on save)';
+    $('eReceiptLink').onclick = e=> e.preventDefault();
+    $('eReceiptRemove').textContent = 'Clear';
+  } else if(pendingReceipt.path && !pendingReceipt.removed){
+    $('eReceiptCurrent').style.display='flex';
+    $('eReceiptName').textContent = pendingReceipt.filename || 'Receipt';
+    $('eReceiptRemove').textContent = 'Remove';
+    $('eReceiptLink').onclick = async (e)=>{
+      e.preventDefault();
+      try{ const url = await getReceiptSignedUrl(pendingReceipt.path); window.open(url, '_blank'); }
+      catch(err){ toast(err.message || 'Could not open receipt'); }
+    };
+  } else {
+    $('eReceiptCurrent').style.display='none';
+  }
+}
+$('eReceiptFile').addEventListener('change', updateReceiptUI);
+$('eReceiptRemove').onclick = ()=>{
+  if($('eReceiptFile').files[0]){ $('eReceiptFile').value=''; }
+  else { pendingReceipt.removed = true; }
+  updateReceiptUI();
+};
 function openExpenseModal(expense){
   editingExpenseId = expense ? expense.id : null;
   $('expenseModalTitle').textContent = expense ? 'Edit expense' : 'Add expense';
@@ -1225,6 +1382,9 @@ function openExpenseModal(expense){
   $('eSpreadField').style.display = $('eFrequency').value==='lump_sum' ? '' : 'none';
   $('eStartDate').value = expense ? expense.startDate : new Date().toISOString().slice(0,10);
   $('eActive').checked = expense ? expense.active : true;
+  $('eReceiptFile').value = '';
+  pendingReceipt = {path: expense ? expense.receiptPath||null : null, filename: expense ? expense.receiptFilename||null : null, removed:false};
+  updateReceiptUI();
   $('expenseModalOverlay').classList.add('open');
   navPush('expenseModal');
 }
@@ -1245,11 +1405,33 @@ $('expenseModalSave').onclick = async ()=>{
     category, description: $('eDescription').value.trim(), amount,
     frequency: $('eFrequency').value, startDate: $('eStartDate').value || new Date().toISOString().slice(0,10),
     active: $('eActive').checked, spreadMonths: $('eFrequency').value==='lump_sum' ? (Number($('eSpreadMonths').value)||12) : null,
+    receiptPath: pendingReceipt.removed ? null : pendingReceipt.path,
+    receiptFilename: pendingReceipt.removed ? null : pendingReceipt.filename,
   };
+  const newFile = $('eReceiptFile').files[0];
+  let oldPathToDelete = null;
   $('expenseModalSave').disabled = true; $('expenseModalSave').textContent = 'Saving…';
   try{
-    if(editingExpenseId){ await updateExpenseRow(editingExpenseId, payload); toast('Expense updated'); }
-    else { await createExpenseRow(payload); toast('Expense saved'); }
+    if(newFile){
+      if(pendingReceipt.path) oldPathToDelete = pendingReceipt.path; // being replaced
+      const uploaded = await uploadReceiptFile(newFile);
+      payload.receiptPath = uploaded.path;
+      payload.receiptFilename = uploaded.filename;
+    } else if(pendingReceipt.removed && pendingReceipt.path){
+      oldPathToDelete = pendingReceipt.path;
+    }
+    const previousExpense = editingExpenseId ? allExpenses.find(e=>String(e.id)===String(editingExpenseId)) : null;
+    if(editingExpenseId){
+      await updateExpenseRow(editingExpenseId, payload);
+      toast('Expense updated');
+      sendExpenseNotificationEmail(payload, newFile || null, { action:'updated', previous: previousExpense, receiptRemoved: pendingReceipt.removed && !newFile });
+    }
+    else {
+      await createExpenseRow(payload);
+      toast('Expense saved');
+      sendExpenseNotificationEmail(payload, newFile || null, { action:'created' });
+    }
+    if(oldPathToDelete) deleteReceiptFile(oldPathToDelete);
     closeExpenseModal();
     await reloadExpensesAndRender();
   }catch(e){ toast(e.message || 'Could not save expense'); }
@@ -1257,7 +1439,13 @@ $('expenseModalSave').onclick = async ()=>{
 };
 async function handleDeleteExpense(id){
   if(!confirm('Delete this expense? This cannot be undone.')) return;
-  try{ await deleteExpenseRow(id); toast('Expense deleted'); await reloadExpensesAndRender(); }
+  const expense = allExpenses.find(e=>String(e.id)===String(id));
+  try{
+    await deleteExpenseRow(id);
+    if(expense && expense.receiptPath) deleteReceiptFile(expense.receiptPath);
+    toast('Expense deleted');
+    await reloadExpensesAndRender();
+  }
   catch(e){ toast(e.message || 'Could not delete expense'); }
 }
 async function reloadExpensesAndRender(){
@@ -1359,8 +1547,8 @@ function doExportContractors(){
   toast(`Exported ${body.length} contractor${body.length===1?'':'s'}`);
 }
 function doExportExpenses(){
-  const header = ['Category','Description','Amount','Frequency','Spread (months)','Start Date','Monthly Equivalent','Active'];
-  const body = allExpenses.map(e=>[e.category, e.description, e.amount.toFixed(2), freqLabel(e.frequency, e), e.spreadMonths||'', e.startDate, monthlyEquivalent(e).toFixed(2), e.active?'Yes':'No']);
+  const header = ['Category','Description','Amount','Frequency','Spread (months)','Start Date','Monthly Equivalent','Active','Receipt'];
+  const body = allExpenses.map(e=>[e.category, e.description, e.amount.toFixed(2), freqLabel(e.frequency, e), e.spreadMonths||'', e.startDate, monthlyEquivalent(e).toFixed(2), e.active?'Yes':'No', e.receiptFilename||'']);
   downloadCsv(`one18-expenses-${new Date().toISOString().slice(0,10)}.csv`, [header, ...body]);
   toast(`Exported ${body.length} expense${body.length===1?'':'s'}`);
 }
