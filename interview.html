@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One:18 Cleaning — Contractor Self-Interview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#142642;
+    --navy-panel:#1c3355;
+    --gold:#c9a24b;
+    --gold-soft:#e4c777;
+    --cream:#f6f2e8;
+    --paper:#fffcf5;
+    --ink:#20242b;
+    --slate:#5c6470;
+    --line:#e4ddca;
+    --success:#3f6f56;
+    --success-bg:#e9f1eb;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --cream:#f6f2e8; --paper:#fffcf5; --ink:#20242b; }
+  }
+  :root[data-theme="dark"]{ --cream:#f6f2e8; --paper:#fffcf5; --ink:#20242b; }
+
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--cream); color:var(--ink);
+    font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{ font-family:'Fraunces',serif; font-weight:600; margin:0; }
+
+  .wrap{ max-width:720px; margin:0 auto; padding:0 20px 60px; }
+
+  header{
+    background:var(--navy-deep); color:var(--cream);
+    padding:40px 20px 34px; text-align:center; margin-bottom:28px;
+  }
+  .badge{
+    width:84px; height:84px; border-radius:50%; border:2px solid var(--gold-soft);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    margin:0 auto 16px; color:var(--gold-soft);
+  }
+  .badge .one18{ font-family:'Fraunces',serif; font-weight:700; font-size:17px; line-height:1; }
+  .badge .tag{ font-size:6px; letter-spacing:1px; margin-top:3px; }
+  header h1{ font-size:26px; color:var(--cream); margin-bottom:8px; }
+  header p{ font-size:14px; color:rgba(246,242,232,0.75); max-width:480px; margin:0 auto; line-height:1.55; }
+
+  .card{
+    background:var(--paper); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; margin-bottom:16px;
+  }
+  .card label{
+    display:block; font-size:12px; font-weight:600; color:var(--slate);
+    text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;
+  }
+  .card .qnum{ color:var(--gold); font-family:'Fraunces',serif; font-weight:700; margin-right:6px; }
+  input[type=text], input[type=email], input[type=tel], textarea{
+    width:100%; font-family:'Inter',sans-serif; font-size:15px; padding:11px 12px;
+    border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink);
+  }
+  textarea{ min-height:90px; resize:vertical; line-height:1.5; }
+  input:focus, textarea:focus{ outline:2px solid var(--gold-soft); outline-offset:1px; border-color:var(--gold); }
+  .two-col{ display:flex; gap:14px; }
+  .two-col > div{ flex:1; }
+
+  .btn{
+    font-family:'Inter',sans-serif; font-size:15px; font-weight:600; padding:14px 20px;
+    border-radius:8px; border:none; cursor:pointer; width:100%;
+  }
+  .btn-primary{ background:var(--navy-deep); color:var(--gold-soft); }
+  .btn-primary:hover{ background:var(--navy-panel); }
+  .btn-primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn-gold{ background:var(--gold); color:var(--navy-deep); }
+  .btn-gold:hover{ background:var(--gold-soft); }
+  .btn-ghost{ background:transparent; color:var(--slate); border:1px solid var(--line); }
+  .btn-ghost:hover{ border-color:var(--gold); color:var(--ink); }
+  .btn-row{ display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+
+  .hint{ font-size:12.5px; color:var(--slate); margin-top:10px; line-height:1.5; }
+  .error-text{ font-size:12.5px; color:#a34a2f; margin-top:8px; }
+
+  #reviewScreen, #doneScreen{ display:none; }
+
+  .review-item{ padding:12px 0; border-bottom:1px solid var(--line); }
+  .review-item:last-child{ border-bottom:none; }
+  .review-item .q{ font-size:12px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:4px; }
+  .review-item .a{ font-size:14.5px; color:var(--ink); white-space:pre-wrap; line-height:1.5; }
+  .review-item .a.empty{ color:var(--slate); font-style:italic; }
+
+  .success-box{
+    background:var(--success-bg); color:var(--success); border-radius:8px;
+    padding:16px 18px; text-align:center; margin-bottom:16px; font-size:14.5px; line-height:1.5;
+  }
+  .footer-note{ text-align:center; font-size:12px; color:var(--slate); margin-top:24px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">
+    <div class="one18">One:18</div>
+    <div class="tag">CLEANING WITH PURPOSE</div>
+  </div>
+  <h1>Contractor Self-Interview</h1>
+  <p>Thanks for your interest in cleaning with One:18. Take a few minutes to answer the questions below in your own words — there's no need to rush, and you can take your time on each one.</p>
+</header>
+
+<div class="wrap">
+
+  <div id="formScreen">
+    <div class="card">
+      <div class="two-col">
+        <div>
+          <label for="fullName">Your name</label>
+          <input type="text" id="fullName" placeholder="First and last name">
+        </div>
+        <div>
+          <label for="phone">Phone or email</label>
+          <input type="text" id="phone" placeholder="Best way to reach you">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label><span class="qnum">1.</span>Tell me about your residential cleaning experience. What types of cleans do you do most often?</label>
+      <textarea id="q1"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">2.</span>Walk me through how you would clean a home from start to finish.</label>
+      <textarea id="q2"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">3.</span>Do you have your own reliable transportation, cleaning supplies, and equipment?</label>
+      <textarea id="q3"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">4.</span>What areas of Greater Houston are you willing to service?</label>
+      <textarea id="q4"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">5.</span>What does your typical availability look like?</label>
+      <textarea id="q5"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">6.</span>If you accidentally damaged something in a client's home, what would you do?</label>
+      <textarea id="q6"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">7.</span>How do you handle a surface when you're unsure which cleaning product is safe to use?</label>
+      <textarea id="q7"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">8.</span>Are you comfortable completing a background check and providing the required contractor documentation?</label>
+      <textarea id="q8"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">9.</span>Are you comfortable with project-based pay and choosing whether to accept or decline individual jobs?</label>
+      <textarea id="q9"></textarea>
+    </div>
+    <div class="card">
+      <label><span class="qnum">10.</span>What questions do you have for us about One:18 Cleaning or how projects work?</label>
+      <textarea id="q10"></textarea>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goToReview()">Review my answers</button>
+    </div>
+    <div class="error-text" id="formError"></div>
+  </div>
+
+  <div id="reviewScreen">
+    <div class="card">
+      <h2 style="font-size:19px; margin-bottom:4px;">Review before sending</h2>
+      <p class="hint" style="margin-top:0;">Check your answers below, then send them to One:18. You can go back and edit anything first.</p>
+    </div>
+    <div class="card" id="reviewContent"></div>
+    <div class="btn-row">
+      <button class="btn btn-gold" onclick="sendByEmail()">Send my answers by email</button>
+      <button class="btn btn-ghost" id="downloadBtn" onclick="downloadAnswers()" style="display:none;">Download a copy (.txt)</button>
+      <button class="btn btn-ghost" onclick="backToForm()">Back to edit</button>
+    </div>
+    <p class="hint">"Send my answers by email" opens your own email app with everything filled in and addressed to One:18 — just hit send. If that doesn't open properly, download a copy instead and attach it to an email to <b>info@one18cleaning.com</b>.</p>
+  </div>
+
+  <div id="doneScreen">
+    <div class="success-box">
+      Your email app should now be open with your answers ready to send. If you'd like a backup copy for yourself, you can still download it below.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="downloadBtn2" onclick="downloadAnswers()" style="display:none;">Download a copy (.txt)</button>
+    </div>
+  </div>
+
+  <p class="footer-note">One:18 Cleaning &nbsp;·&nbsp; Cleaning With Purpose &nbsp;·&nbsp; Isaiah 1:18 &nbsp;·&nbsp; Greater Houston Area</p>
+</div>
+
+<script>
+const QUESTIONS = [
+  "Tell me about your residential cleaning experience. What types of cleans do you do most often?",
+  "Walk me through how you would clean a home from start to finish.",
+  "Do you have your own reliable transportation, cleaning supplies, and equipment?",
+  "What areas of Greater Houston are you willing to service?",
+  "What does your typical availability look like?",
+  "If you accidentally damaged something in a client's home, what would you do?",
+  "How do you handle a surface when you're unsure which cleaning product is safe to use?",
+  "Are you comfortable completing a background check and providing the required contractor documentation?",
+  "Are you comfortable with project-based pay and choosing whether to accept or decline individual jobs?",
+  "What questions do you have for us about One:18 Cleaning or how projects work?"
+];
+
+function collect(){
+  return {
+    name: document.getElementById('fullName').value.trim(),
+    contact: document.getElementById('phone').value.trim(),
+    answers: QUESTIONS.map((q,i)=> document.getElementById('q'+(i+1)).value.trim())
+  };
+}
+
+function goToReview(){
+  const data = collect();
+  if(!data.name){
+    document.getElementById('formError').textContent = 'Please enter your name before continuing.';
+    return;
+  }
+  document.getElementById('formError').textContent = '';
+
+  const contentEl = document.getElementById('reviewContent');
+  let html = `<div class="review-item"><div class="q">Name</div><div class="a">${escapeHtml(data.name)}</div></div>`;
+  if(data.contact){
+    html += `<div class="review-item"><div class="q">Contact</div><div class="a">${escapeHtml(data.contact)}</div></div>`;
+  }
+  data.answers.forEach((a,i)=>{
+    html += `<div class="review-item"><div class="q">${i+1}. ${escapeHtml(QUESTIONS[i])}</div><div class="a ${a?'':'empty'}">${a ? escapeHtml(a) : '(no answer provided)'}</div></div>`;
+  });
+  contentEl.innerHTML = html;
+
+  document.getElementById('formScreen').style.display = 'none';
+  document.getElementById('reviewScreen').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function backToForm(){
+  document.getElementById('reviewScreen').style.display = 'none';
+  document.getElementById('formScreen').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function buildPlainText(){
+  const data = collect();
+  let out = `ONE:18 CLEANING — CONTRACTOR SELF-INTERVIEW\n\n`;
+  out += `Name: ${data.name}\n`;
+  if(data.contact) out += `Contact: ${data.contact}\n`;
+  out += `\n`;
+  data.answers.forEach((a,i)=>{
+    out += `${i+1}. ${QUESTIONS[i]}\n${a || '(no answer provided)'}\n\n`;
+  });
+  return out;
+}
+
+function sendByEmail(){
+  const data = collect();
+  const subject = `Contractor Self-Interview — ${data.name || 'New Applicant'}`;
+  const body = buildPlainText();
+  const mailto = `mailto:info@one18cleaning.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+
+  document.getElementById('reviewScreen').style.display = 'none';
+  document.getElementById('doneScreen').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function claudeAvailable(){
+  return (typeof window !== 'undefined') && (typeof window.claude !== 'undefined') && (typeof window.claude.use === 'function');
+}
+
+async function downloadAnswers(){
+  if(!claudeAvailable()){
+    fallbackDownload();
+    return;
+  }
+  try{
+    const downloads = await claude.use("downloads");
+    if(!downloads){
+      fallbackDownload();
+      return;
+    }
+    const data = collect();
+    const filename = `One18-Contractor-Interview-${(data.name || 'applicant').replace(/[^a-z0-9]+/gi,'-')}.txt`;
+    await downloads.save({ filename, data: buildPlainText() });
+  }catch(err){
+    if(err && err.code === 'declined'){ return; }
+    console.error('Download error', err);
+    fallbackDownload();
+  }
+}
+
+function fallbackDownload(){
+  // Plain-browser download path (works anywhere, including outside claude.ai — e.g. GitHub Pages).
+  const data = collect();
+  const filename = `One18-Contractor-Interview-${(data.name || 'applicant').replace(/[^a-z0-9]+/gi,'-')}.txt`;
+  const blob = new Blob([buildPlainText()], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+
+// Show the download buttons whether or not the claude.ai capability is present —
+// the fallback above covers plain-browser hosting (GitHub Pages, etc.).
+(async ()=>{
+  document.getElementById('downloadBtn').style.display = 'block';
+  document.getElementById('downloadBtn2').style.display = 'block';
+})();
+</script>
+
+</body>
+</html>
