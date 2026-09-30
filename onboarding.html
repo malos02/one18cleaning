@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>One:18 Cleaning — Contractor Onboarding Forms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --navy-deep:#142642; --navy-panel:#1c3355; --navy-hover:#254072;
+    --gold:#c9a24b; --gold-soft:#e4c777;
+    --cream:#f6f2e8; --paper:#fffcf5;
+    --ink:#20242b; --slate:#5c6470; --line:#e4ddca;
+    --success:#3f6f56; --success-bg:#e9f1eb;
+    --warn:#a34a2f; --warn-bg:#fbeae3;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--cream); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3{ font-family:'Fraunces',serif; font-weight:600; margin:0; }
+  .app{ display:flex; min-height:100vh; }
+
+  /* Sidebar */
+  .sidebar{ width:240px; flex-shrink:0; background:var(--navy-deep); color:var(--cream); display:flex; flex-direction:column; padding:22px 0 16px; }
+  .brand{ display:flex; align-items:center; gap:10px; padding:0 20px 20px; border-bottom:1px solid rgba(228,199,119,0.25); margin-bottom:10px; }
+  .brand-mark{ width:34px;height:34px;border-radius:50%; border:1.5px solid var(--gold-soft); display:flex;align-items:center;justify-content:center; font-family:'Fraunces',serif; font-weight:600; font-size:13px; color:var(--gold-soft); flex-shrink:0; }
+  .brand-text .name{ font-family:'Fraunces',serif; font-weight:600; font-size:15px; }
+  .brand-text .tag{ font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-soft); margin-top:2px; }
+  nav{ display:flex; flex-direction:column; gap:2px; padding:8px 10px; flex:1; overflow-y:auto; }
+  .tab-btn{ text-align:left; background:transparent; border:none; color:rgba(246,242,232,0.78); font-family:'Inter',sans-serif; font-size:13.5px; font-weight:500; padding:11px 12px; border-radius:6px; cursor:pointer; border-left:3px solid transparent; display:flex; align-items:center; gap:8px; }
+  .tab-btn:hover{ background:var(--navy-hover); color:var(--cream); }
+  .tab-btn.active{ background:var(--navy-panel); color:var(--gold-soft); border-left-color:var(--gold); font-weight:600; }
+  .tab-btn .status{ margin-left:auto; font-size:11px; }
+  .tab-btn .status.done{ color:var(--success); }
+  .tab-btn .status.pending{ color:rgba(246,242,232,0.35); }
+  .sidebar-foot{ padding:14px 20px 0; font-size:10.5px; color:rgba(246,242,232,0.4); border-top:1px solid rgba(228,199,119,0.15); margin-top:8px; }
+
+  /* Main */
+  main{ flex:1; min-width:0; padding:36px 44px 60px; max-width:900px; }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+  .eyebrow{ font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:6px; }
+  .panel h2{ font-size:24px; margin-bottom:6px; }
+  .panel > .lede{ color:var(--slate); font-size:14px; max-width:640px; margin-bottom:24px; line-height:1.55; }
+
+  .card{ background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:22px 24px; margin-bottom:18px; }
+  .card h3{ font-size:16px; margin-bottom:14px; }
+  .field-row{ display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .field{ flex:1; min-width:200px; display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:11.5px; font-weight:600; color:var(--slate); text-transform:uppercase; letter-spacing:0.03em; }
+  input[type=text], input[type=email], input[type=tel], input[type=date], textarea{
+    font-family:'Inter',sans-serif; font-size:14.5px; padding:9px 11px; border:1px solid var(--line);
+    border-radius:6px; background:#fff; color:var(--ink); width:100%;
+  }
+  input:focus, textarea:focus{ outline:2px solid var(--gold-soft); outline-offset:1px; border-color:var(--gold); }
+
+  .check-item{ display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13.8px; line-height:1.5; }
+  .check-item:last-child{ border-bottom:none; }
+  .check-item input[type=checkbox]{ width:18px; height:18px; flex-shrink:0; margin-top:2px; }
+  .section-label{ font-size:12.5px; font-weight:700; color:var(--navy-deep); text-transform:uppercase; letter-spacing:0.03em; margin:18px 0 6px; }
+  .section-label:first-child{ margin-top:0; }
+
+  .sig-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .sig-row .field{ flex:1; min-width:180px; }
+  .sig-hint{ font-size:11.5px; color:var(--slate); margin-top:4px; }
+
+  .btn{ font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600; padding:11px 18px; border-radius:7px; border:none; cursor:pointer; }
+  .btn-primary{ background:var(--navy-deep); color:var(--gold-soft); }
+  .btn-primary:hover{ background:var(--navy-panel); }
+  .btn-gold{ background:var(--gold); color:var(--navy-deep); }
+  .btn-gold:hover{ background:var(--gold-soft); }
+  .btn-ghost{ background:transparent; color:var(--slate); border:1px solid var(--line); }
+  .btn-ghost:hover{ border-color:var(--gold); color:var(--ink); }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+
+  .error-text{ font-size:12.5px; color:var(--warn); margin-top:8px; }
+  .notice{ font-size:13px; padding:12px 14px; border-radius:7px; margin-bottom:16px; line-height:1.5; }
+  .notice.warn{ background:var(--warn-bg); color:var(--warn); }
+  .notice.ok{ background:var(--success-bg); color:var(--success); }
+
+  .review-row{ display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); }
+  .review-row:last-child{ border-bottom:none; }
+  .review-row .label{ font-size:14px; font-weight:600; }
+  .review-row .label small{ display:block; font-weight:400; color:var(--slate); font-size:12px; margin-top:2px; }
+
+  @media (max-width:820px){
+    .app{ flex-direction:column; }
+    .sidebar{ width:100%; flex-direction:row; align-items:center; padding:12px 14px; position:sticky; top:0; z-index:20; }
+    .brand{ border-bottom:none; padding:0; margin-bottom:0; margin-right:10px; }
+    .brand-text .tag{ display:none; }
+    nav{ flex-direction:row; overflow-x:auto; padding:2px 0; gap:6px; }
+    .tab-btn{ white-space:nowrap; border-left:none; border-bottom:3px solid transparent; border-radius:6px 6px 0 0; }
+    .tab-btn.active{ border-left-color:transparent; border-bottom-color:var(--gold); }
+    .tab-btn .status{ display:none; }
+    .sidebar-foot{ display:none; }
+    main{ padding:20px 16px 48px; }
+    .field-row{ flex-direction:column; }
+    .btn{ width:100%; }
+    .btn-row{ flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">✦</div>
+      <div class="brand-text"><div class="name">One:18</div><div class="tag">Contractor Onboarding</div></div>
+    </div>
+    <nav>
+      <button class="tab-btn active" data-tab="overview">Job Overview <span class="status" id="stat-overview"></span></button>
+      <button class="tab-btn" data-tab="background">Background Screening <span class="status pending" id="stat-background">○</span></button>
+      <button class="tab-btn" data-tab="emergency">Emergency Contact <span class="status pending" id="stat-emergency">○</span></button>
+      <button class="tab-btn" data-tab="privacy">Privacy &amp; Safety <span class="status pending" id="stat-privacy">○</span></button>
+      <button class="tab-btn" data-tab="submit">Review &amp; Submit</button>
+    </nav>
+    <div class="sidebar-foot">One:18 Cleaning &middot; Cleaning With Purpose</div>
+  </aside>
+
+  <main>
+
+    <!-- ===================== OVERVIEW ===================== -->
+    <section class="panel active" id="tab-overview">
+      <div class="eyebrow">Independent Contractor · 1099</div>
+      <h2>Independent Cleaning Professional</h2>
+      <p class="lede">One:18 Cleaning is a growing residential and property cleaning company serving the Greater Houston area. Inspired by Isaiah 1:18, our brand is built around integrity, excellence, service, and attention to detail.</p>
+
+      <div class="card">
+        <h3>Types of Cleaning Opportunities</h3>
+        <p style="font-size:14px; line-height:1.7; margin:0;">Recurring residential cleaning &middot; Deep cleaning &middot; Move-in / move-out cleaning &middot; Realtor and listing-preparation cleaning &middot; Airbnb / short-term rental turnovers &middot; Post-construction and builder final cleaning &middot; Apartment and rental-property turnovers &middot; Select commercial cleaning opportunities</p>
+      </div>
+
+      <div class="card">
+        <h3>What We're Looking For</h3>
+        <p style="font-size:14px; line-height:1.7; margin:0;">Dependable and punctual &middot; Detail-oriented &middot; Professional and respectful in clients' homes &middot; Experienced in residential or professional cleaning &middot; Comfortable working independently &middot; Able to communicate clearly and professionally &middot; Committed to delivering high-quality results &middot; Able to reliably travel to accepted projects throughout their selected Greater Houston service area</p>
+      </div>
+
+      <div class="card">
+        <h3>Contractor Requirements</h3>
+        <p style="font-size:14px; line-height:1.7; margin:0;">Operate as an independent contractor and complete required 1099/W-9 documentation &middot; Provide valid identification &middot; Successfully complete applicable screening/background-check requirements &middot; Maintain reliable transportation &middot; Have a reliable smartphone for project information and communication &middot; Maintain any required business or liability insurance applicable to assigned work &middot; Provide cleaning supplies/equipment when required for the particular contracted project</p>
+      </div>
+
+      <div class="card">
+        <h3>Compensation</h3>
+        <p style="font-size:14px; line-height:1.7; margin:0;">Competitive project-based compensation, varying by property size, cleaning type, scope of work, project complexity, location, and approved add-on services. Additional opportunities may become available for cleaning professionals who consistently receive strong quality feedback and demonstrate reliability.</p>
+      </div>
+
+      <div class="notice ok">This posting describes opportunities for independent contractors, not guaranteed employment, hours, or project volume. Contractors may accept or decline offered projects. Final project terms and compensation are disclosed before acceptance.</div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="goTo('background')">Continue to Background Screening Authorization →</button>
+      </div>
+    </section>
+
+    <!-- ===================== BACKGROUND SCREENING ===================== -->
+    <section class="panel" id="tab-background">
+      <div class="eyebrow">Form 1 of 3</div>
+      <h2>Background Screening Authorization</h2>
+      <p class="lede">One:18 Cleaning, LLC may require identity verification and/or a background screening as part of evaluating an independent cleaning professional for access to customer homes, businesses, keys, access codes, and other private property.</p>
+
+      <div class="card">
+        <h3>Applicant / Contractor Information</h3>
+        <div class="field-row">
+          <div class="field"><label>Full legal name</label><input type="text" id="bg_fullName"></div>
+          <div class="field"><label>Other names used (if any)</label><input type="text" id="bg_otherNames"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Current address</label><input type="text" id="bg_address"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>City / State / ZIP</label><input type="text" id="bg_cityStateZip"></div>
+          <div class="field"><label>Phone</label><input type="tel" id="bg_phone"></div>
+          <div class="field"><label>Email</label><input type="email" id="bg_email"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Authorization</h3>
+        <p style="font-size:13.5px; line-height:1.6; color:var(--slate);">I authorize One:18 Cleaning, LLC and, where applicable, its authorized background-screening provider to verify information I provide and to obtain lawful background information for the purpose of determining my eligibility to perform independent cleaning projects involving access to customer property. Depending on the screening requested and permitted by applicable law, the screening may include identity verification, address history, criminal-record searches, sex-offender registry searches, and other job-relevant public-record information. I understand this authorization does not guarantee I will be offered projects and does not create an employment relationship. I understand that sensitive identifiers such as date of birth or Social Security number should be submitted directly through the screening provider's secure process when applicable, not on this form.</p>
+        <div class="check-item">
+          <input type="checkbox" id="bg_consent">
+          <label for="bg_consent">I have read and understand this authorization and voluntarily authorize the screening described above, subject to applicable law.</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Signature</h3>
+        <div class="sig-row">
+          <div class="field"><label>Type your full name as your signature</label><input type="text" id="bg_signature" placeholder="Your typed signature"></div>
+          <div class="field"><label>Printed name</label><input type="text" id="bg_printedName"></div>
+          <div class="field"><label>Date</label><input type="date" id="bg_date"></div>
+        </div>
+        <div class="sig-hint">Typing your name above and submitting this form serves as your electronic signature.</div>
+      </div>
+
+      <div class="error-text" id="err-background"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="downloadForm('background')">Download this form (PDF)</button>
+        <button class="btn btn-primary" onclick="goTo('emergency')">Continue →</button>
+      </div>
+    </section>
+
+    <!-- ===================== EMERGENCY CONTACT ===================== -->
+    <section class="panel" id="tab-emergency">
+      <div class="eyebrow">Form 2 of 3</div>
+      <h2>Emergency Contact Information</h2>
+      <p class="lede">Please provide an emergency contact One:18 Cleaning, LLC may reach if a serious health, safety, or emergency situation arises while you are performing or traveling in connection with an accepted project.</p>
+
+      <div class="card">
+        <h3>Contractor Information</h3>
+        <div class="field-row">
+          <div class="field"><label>Contractor name</label><input type="text" id="ec_name"></div>
+          <div class="field"><label>Phone</label><input type="tel" id="ec_phone"></div>
+          <div class="field"><label>Email</label><input type="email" id="ec_email"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Primary Emergency Contact</h3>
+        <div class="field-row">
+          <div class="field"><label>Full name</label><input type="text" id="ec_p_name"></div>
+          <div class="field"><label>Relationship to contractor</label><input type="text" id="ec_p_rel"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Primary phone</label><input type="tel" id="ec_p_phone"></div>
+          <div class="field"><label>Alternate phone</label><input type="tel" id="ec_p_altphone"></div>
+          <div class="field"><label>Email (optional)</label><input type="email" id="ec_p_email"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Secondary Emergency Contact <span style="font-weight:400; color:var(--slate); text-transform:none; font-size:12px;">(optional)</span></h3>
+        <div class="field-row">
+          <div class="field"><label>Full name</label><input type="text" id="ec_s_name"></div>
+          <div class="field"><label>Relationship to contractor</label><input type="text" id="ec_s_rel"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Primary phone</label><input type="tel" id="ec_s_phone"></div>
+          <div class="field"><label>Alternate phone</label><input type="tel" id="ec_s_altphone"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Authorization</h3>
+        <div class="check-item">
+          <input type="checkbox" id="ec_consent">
+          <label for="ec_consent">I authorize the Company to contact the person(s) listed above in a genuine emergency, and understand this does not make the Company responsible for medical care or transportation. I will notify the Company if this information changes.</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Signature</h3>
+        <div class="sig-row">
+          <div class="field"><label>Type your full name as your signature</label><input type="text" id="ec_signature" placeholder="Your typed signature"></div>
+          <div class="field"><label>Printed name</label><input type="text" id="ec_printedName"></div>
+          <div class="field"><label>Date</label><input type="date" id="ec_date"></div>
+        </div>
+        <div class="sig-hint">Typing your name above and submitting this form serves as your electronic signature.</div>
+      </div>
+
+      <div class="error-text" id="err-emergency"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="downloadForm('emergency')">Download this form (PDF)</button>
+        <button class="btn btn-primary" onclick="goTo('privacy')">Continue →</button>
+      </div>
+    </section>
+
+    <!-- ===================== PRIVACY & SAFETY ===================== -->
+    <section class="panel" id="tab-privacy">
+      <div class="eyebrow">Form 3 of 3</div>
+      <h2>Customer Privacy, Access/Security &amp; Product Safety Acknowledgment</h2>
+      <p class="lede">As an independent cleaning professional accepting projects through One:18 Cleaning, LLC, you may enter private homes or businesses and be entrusted with customer property and nonpublic information. Please review and check each requirement below.</p>
+
+      <div class="card">
+        <div class="field-row">
+          <div class="field"><label>Contractor name</label><input type="text" id="ps_name"></div>
+        </div>
+
+        <div class="section-label">1. Customer Privacy &amp; Confidentiality</div>
+        <div class="check-item"><input type="checkbox" id="ps_1_1"><label for="ps_1_1">I will protect customer names, addresses, phone numbers, schedules, job details, access information, and other nonpublic information.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_1_2"><label for="ps_1_2">I will not photograph, record, copy, post, share, or discuss a customer's home, belongings, documents, family, security systems, or personal information except as reasonably required for an approved project purpose.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_1_3"><label for="ps_1_3">I will take only Company-authorized photos needed for condition documentation, quality assurance, damage reporting, or completion verification and will avoid people and sensitive/private information whenever possible.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_1_4"><label for="ps_1_4">I will not post customer properties, before/after photos, addresses, or project details on social media or use them for my own marketing without written authorization.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_1_5"><label for="ps_1_5">I will immediately report any accidental disclosure, lost device, misdirected photo/message, or other privacy concern involving a customer.</label></div>
+
+        <div class="section-label">2. Property Access &amp; Security</div>
+        <div class="check-item"><input type="checkbox" id="ps_2_1"><label for="ps_2_1">I will use keys, lockboxes, gate codes, alarm codes, garage access, door codes, or other credentials only for the accepted project and only as authorized.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_2_2"><label for="ps_2_2">I will not copy, save, share, photograph, or disclose customer access credentials except through an authorized Company process.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_2_3"><label for="ps_2_3">I will not allow unauthorized persons, guests, children, or animals under my control to enter a customer property while I am performing services.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_2_4"><label for="ps_2_4">I will follow customer instructions for entry, locking doors/windows, alarms, keys, pets, and property security.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_2_5"><label for="ps_2_5">Before leaving, I will reasonably verify that required doors/windows are secured, access devices are returned or handled as instructed, lights/water/appliances used during cleaning are left in an appropriate condition, and the property is secured.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_2_6"><label for="ps_2_6">I will immediately report a lost key/access device, lockout, alarm issue, suspected security problem, unauthorized person, or inability to secure the property.</label></div>
+
+        <div class="section-label">3. Customer Property &amp; Incident Reporting</div>
+        <div class="check-item"><input type="checkbox" id="ps_3_1"><label for="ps_3_1">I will use reasonable care around furniture, flooring, countertops, appliances, electronics, artwork, valuables, and other customer property.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_3_2"><label for="ps_3_2">I will not move unusually heavy, fragile, high-value, or unsafe items unless the accepted scope specifically requires it and it can be done safely.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_3_3"><label for="ps_3_3">I will immediately stop work and notify the Company if I discover existing damage, an unsafe condition, an unknown surface/material, or a situation that could reasonably result in damage.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_3_4"><label for="ps_3_4">I will immediately report actual or suspected breakage, staining, scratching, chemical damage, water damage, injury, theft allegation, pet incident, or other material event, and will not conceal, repair, replace, reimburse, or promise compensation without Company authorization.</label></div>
+
+        <div class="section-label">4. Product &amp; Chemical Safety</div>
+        <div class="check-item"><input type="checkbox" id="ps_4_1"><label for="ps_4_1">I will read and follow product labels, manufacturer instructions, dilution requirements, warnings, and surface-care directions.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_4_2"><label for="ps_4_2">I will never mix bleach with ammonia, vinegar/acids, toilet bowl cleaner, rust remover, or other incompatible chemicals.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_4_3"><label for="ps_4_3">I will not use abrasive products/tools on delicate finishes; acidic cleaners on natural stone; harsh or unapproved chemicals on quartz or specialty surfaces; toilet-bowl cleaner outside the toilet bowl; oils on floors unless specifically surface-approved; excessive dish soap; or unknown/unlabeled products.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_4_4"><label for="ps_4_4">I will test an unfamiliar product or technique in an inconspicuous area when appropriate and will stop and verify before cleaning a surface when product compatibility is uncertain.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_4_5"><label for="ps_4_5">I will use reasonable ventilation and appropriate personal protective equipment and will keep chemicals safely controlled around children and pets.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_4_6"><label for="ps_4_6">I will not perform mold remediation, biohazard/bodily-fluid cleanup, sewage cleanup, pest/infestation cleanup, hazardous-material cleanup, or other specialty hazardous work unless separately authorized and properly qualified.</label></div>
+        <div class="check-item"><input type="checkbox" id="ps_4_7"><label for="ps_4_7">I will never transfer a chemical into an unlabeled container or leave cleaning chemicals unattended in an unsafe location.</label></div>
+      </div>
+
+      <div class="notice warn">WHEN IN DOUBT — DO NOT USE IT. STOP · VERIFY · THEN CLEAN.</div>
+
+      <div class="card">
+        <h3>Acknowledgment &amp; Signature</h3>
+        <p style="font-size:13.5px; color:var(--slate); line-height:1.6;">I acknowledge that I have reviewed and understand these requirements and agree to follow them while performing projects accepted through One:18 Cleaning, LLC.</p>
+        <div class="sig-row">
+          <div class="field"><label>Type your full name as your signature</label><input type="text" id="ps_signature" placeholder="Your typed signature"></div>
+          <div class="field"><label>Printed name</label><input type="text" id="ps_printedName"></div>
+          <div class="field"><label>Date</label><input type="date" id="ps_date"></div>
+        </div>
+        <div class="sig-hint">Typing your name above and submitting this form serves as your electronic signature.</div>
+      </div>
+
+      <div class="error-text" id="err-privacy"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="downloadForm('privacy')">Download this form (PDF)</button>
+        <button class="btn btn-primary" onclick="goTo('submit')">Continue to Review &amp; Submit →</button>
+      </div>
+    </section>
+
+    <!-- ===================== REVIEW & SUBMIT ===================== -->
+    <section class="panel" id="tab-submit">
+      <div class="eyebrow">Final Step</div>
+      <h2>Review &amp; Submit</h2>
+      <p class="lede">Make sure all three forms are complete, then submit. This opens your own email app with everything filled in and addressed to One:18 — just hit send.</p>
+
+      <div class="card">
+        <div class="review-row"><div class="label">Background Screening Authorization<small>Signature &amp; consent required</small></div><div id="rev-background">—</div></div>
+        <div class="review-row"><div class="label">Emergency Contact Information<small>Signature &amp; consent required</small></div><div id="rev-emergency">—</div></div>
+        <div class="review-row"><div class="label">Privacy, Access/Security &amp; Product Safety<small>All 22 items checked, plus signature required</small></div><div id="rev-privacy">—</div></div>
+      </div>
+
+      <div id="submitError" class="notice warn" style="display:none;"></div>
+      <div id="submitOk" class="notice ok" style="display:none;">Your email app should now be open with all three forms' information ready to send. If you'd like backup copies for yourself, download each form as a PDF from its tab.</div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="checkAllForms()">Re-check status</button>
+        <button class="btn btn-gold" onclick="submitAll()">Submit all forms by email</button>
+      </div>
+      <p class="sig-hint" style="margin-top:14px;">If your email app doesn't open properly, go back to each tab and use "Download this form (PDF)," then attach the three files to an email addressed to <b>info@one18cleaning.com</b>.</p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ---------------- Tab switching ---------------- */
+function goTo(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='tab-'+tab));
+  window.scrollTo(0,0);
+  if(tab==='submit') checkAllForms();
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> goTo(btn.dataset.tab));
+});
+
+/* ---------------- Validation ---------------- */
+function val(id){ const el = document.getElementById(id); return el ? (el.type==='checkbox' ? el.checked : el.value.trim()) : ''; }
+
+function validateBackground(){
+  const required = ['bg_fullName','bg_address','bg_cityStateZip','bg_phone','bg_email','bg_signature','bg_printedName','bg_date'];
+  const missing = required.filter(id => !val(id));
+  const consented = val('bg_consent');
+  return { ok: missing.length===0 && consented, missingFields: missing.length>0, missingConsent: !consented };
+}
+function validateEmergency(){
+  const required = ['ec_name','ec_phone','ec_p_name','ec_p_rel','ec_p_phone','ec_signature','ec_printedName','ec_date'];
+  const missing = required.filter(id => !val(id));
+  const consented = val('ec_consent');
+  return { ok: missing.length===0 && consented, missingFields: missing.length>0, missingConsent: !consented };
+}
+function validatePrivacy(){
+  const boxes = [];
+  for(let s=1; s<=4; s++){
+    const counts = {1:5,2:6,3:4,4:7}[s];
+    for(let i=1; i<=counts; i++){ boxes.push('ps_'+s+'_'+i); }
+  }
+  const uncheckedCount = boxes.filter(id=>!val(id)).length;
+  const required = ['ps_name','ps_signature','ps_printedName','ps_date'];
+  const missing = required.filter(id => !val(id));
+  return { ok: uncheckedCount===0 && missing.length===0, uncheckedCount, missingFields: missing.length>0 };
+}
+
+function updateStatus(tab, ok){
+  const el = document.getElementById('stat-'+tab);
+  if(!el) return;
+  el.textContent = ok ? '✓' : '○';
+  el.className = 'status ' + (ok ? 'done' : 'pending');
+}
+
+function checkAllForms(){
+  const bg = validateBackground();
+  const ec = validateEmergency();
+  const ps = validatePrivacy();
+  updateStatus('background', bg.ok);
+  updateStatus('emergency', ec.ok);
+  updateStatus('privacy', ps.ok);
+
+  document.getElementById('rev-background').innerHTML = bg.ok ? '<span style="color:var(--success); font-weight:600;">Complete</span>' : '<span style="color:var(--warn); font-weight:600;">Incomplete</span>';
+  document.getElementById('rev-emergency').innerHTML = ec.ok ? '<span style="color:var(--success); font-weight:600;">Complete</span>' : '<span style="color:var(--warn); font-weight:600;">Incomplete</span>';
+  document.getElementById('rev-privacy').innerHTML = ps.ok ? '<span style="color:var(--success); font-weight:600;">Complete</span>' : '<span style="color:var(--warn); font-weight:600;">Incomplete ('+ps.uncheckedCount+' item(s) unchecked)</span>';
+
+  return bg.ok && ec.ok && ps.ok;
+}
+
+/* ---------------- Plain-text builders (for email + PDF text) ---------------- */
+function textBackground(){
+  let t = "BACKGROUND SCREENING AUTHORIZATION\n\n";
+  t += "Full legal name: "+val('bg_fullName')+"\n";
+  t += "Other names used: "+(val('bg_otherNames')||'—')+"\n";
+  t += "Current address: "+val('bg_address')+"\n";
+  t += "City/State/ZIP: "+val('bg_cityStateZip')+"\n";
+  t += "Phone: "+val('bg_phone')+"\n";
+  t += "Email: "+val('bg_email')+"\n\n";
+  t += "Consent given: "+(val('bg_consent') ? 'Yes' : 'No')+"\n\n";
+  t += "Signature: "+val('bg_signature')+"\n";
+  t += "Printed name: "+val('bg_printedName')+"\n";
+  t += "Date: "+val('bg_date')+"\n";
+  return t;
+}
+function textEmergency(){
+  let t = "EMERGENCY CONTACT INFORMATION\n\n";
+  t += "Contractor name: "+val('ec_name')+"\n";
+  t += "Contractor phone: "+val('ec_phone')+"\n";
+  t += "Contractor email: "+(val('ec_email')||'—')+"\n\n";
+  t += "Primary contact: "+val('ec_p_name')+" ("+val('ec_p_rel')+")\n";
+  t += "Primary phone: "+val('ec_p_phone')+"  Alt: "+(val('ec_p_altphone')||'—')+"  Email: "+(val('ec_p_email')||'—')+"\n\n";
+  if(val('ec_s_name')){
+    t += "Secondary contact: "+val('ec_s_name')+" ("+val('ec_s_rel')+")\n";
+    t += "Secondary phone: "+val('ec_s_phone')+"  Alt: "+(val('ec_s_altphone')||'—')+"\n\n";
+  }
+  t += "Consent given: "+(val('ec_consent') ? 'Yes' : 'No')+"\n\n";
+  t += "Signature: "+val('ec_signature')+"\n";
+  t += "Printed name: "+val('ec_printedName')+"\n";
+  t += "Date: "+val('ec_date')+"\n";
+  return t;
+}
+const PS_LABELS = {
+  ps_1_1:"I will protect customer names, addresses, phone numbers, schedules, job details, access information, and other nonpublic information.",
+  ps_1_2:"I will not photograph, record, copy, post, share, or discuss a customer's home, belongings, documents, family, security systems, or personal information except as reasonably required for an approved project purpose.",
+  ps_1_3:"I will take only Company-authorized photos needed for condition documentation, quality assurance, damage reporting, or completion verification and will avoid people and sensitive/private information whenever possible.",
+  ps_1_4:"I will not post customer properties, before/after photos, addresses, or project details on social media or use them for my own marketing without written authorization.",
+  ps_1_5:"I will immediately report any accidental disclosure, lost device, misdirected photo/message, or other privacy concern involving a customer.",
+  ps_2_1:"I will use keys, lockboxes, gate codes, alarm codes, garage access, door codes, or other credentials only for the accepted project and only as authorized.",
+  ps_2_2:"I will not copy, save, share, photograph, or disclose customer access credentials except through an authorized Company process.",
+  ps_2_3:"I will not allow unauthorized persons, guests, children, or animals under my control to enter a customer property while I am performing services.",
+  ps_2_4:"I will follow customer instructions for entry, locking doors/windows, alarms, keys, pets, and property security.",
+  ps_2_5:"Before leaving, I will reasonably verify that required doors/windows are secured, access devices are returned or handled as instructed, lights/water/appliances used during cleaning are left in an appropriate condition, and the property is secured.",
+  ps_2_6:"I will immediately report a lost key/access device, lockout, alarm issue, suspected security problem, unauthorized person, or inability to secure the property.",
+  ps_3_1:"I will use reasonable care around furniture, flooring, countertops, appliances, electronics, artwork, valuables, and other customer property.",
+  ps_3_2:"I will not move unusually heavy, fragile, high-value, or unsafe items unless the accepted scope specifically requires it and it can be done safely.",
+  ps_3_3:"I will immediately stop work and notify the Company if I discover existing damage, an unsafe condition, an unknown surface/material, or a situation that could reasonably result in damage.",
+  ps_3_4:"I will immediately report actual or suspected breakage, staining, scratching, chemical damage, water damage, injury, theft allegation, pet incident, or other material event, and will not conceal, repair, replace, reimburse, or promise compensation without Company authorization.",
+  ps_4_1:"I will read and follow product labels, manufacturer instructions, dilution requirements, warnings, and surface-care directions.",
+  ps_4_2:"I will never mix bleach with ammonia, vinegar/acids, toilet bowl cleaner, rust remover, or other incompatible chemicals.",
+  ps_4_3:"I will not use abrasive products/tools on delicate finishes; acidic cleaners on natural stone; harsh or unapproved chemicals on quartz or specialty surfaces; toilet-bowl cleaner outside the toilet bowl; oils on floors unless specifically surface-approved; excessive dish soap; or unknown/unlabeled products.",
+  ps_4_4:"I will test an unfamiliar product or technique in an inconspicuous area when appropriate and will stop and verify before cleaning a surface when product compatibility is uncertain.",
+  ps_4_5:"I will use reasonable ventilation and appropriate personal protective equipment and will keep chemicals safely controlled around children and pets.",
+  ps_4_6:"I will not perform mold remediation, biohazard/bodily-fluid cleanup, sewage cleanup, pest/infestation cleanup, hazardous-material cleanup, or other specialty hazardous work unless separately authorized and properly qualified.",
+  ps_4_7:"I will never transfer a chemical into an unlabeled container or leave cleaning chemicals unattended in an unsafe location."
+};
+function textPrivacy(){
+  let t = "CUSTOMER PRIVACY, ACCESS/SECURITY & PRODUCT SAFETY ACKNOWLEDGMENT\n\n";
+  t += "Contractor name: "+val('ps_name')+"\n\n";
+  Object.keys(PS_LABELS).forEach(id=>{
+    t += (val(id) ? "[x] " : "[ ] ") + PS_LABELS[id] + "\n";
+  });
+  t += "\nSignature: "+val('ps_signature')+"\n";
+  t += "Printed name: "+val('ps_printedName')+"\n";
+  t += "Date: "+val('ps_date')+"\n";
+  return t;
+}
+
+/* ---------------- PDF download per form ---------------- */
+function downloadForm(which){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  const margin = 54;
+  let y = margin;
+  const pageWidth = 612;
+  const maxWidth = pageWidth - margin*2;
+
+  function header(title){
+    doc.setFillColor(20,38,66);
+    doc.rect(0,0,pageWidth,64,'F');
+    doc.setTextColor(228,199,119);
+    doc.setFont('times','bold'); doc.setFontSize(16);
+    doc.text('One:18 Cleaning', margin, 30);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.setTextColor(246,242,232);
+    doc.text('Cleaning With Purpose · Isaiah 1:18', margin, 46);
+    y = 90;
+    doc.setTextColor(20,38,66);
+    doc.setFont('times','bold'); doc.setFontSize(14);
+    doc.text(title, margin, y);
+    y += 24;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+    doc.setTextColor(32,36,43);
+  }
+  function line(txt, opts){
+    opts = opts||{};
+    if(opts.bold) doc.setFont('helvetica','bold'); else doc.setFont('helvetica','normal');
+    const lines = doc.splitTextToSize(txt, maxWidth);
+    lines.forEach(l=>{
+      if(y > 740){ doc.addPage(); y = margin; }
+      doc.text(l, margin, y);
+      y += 14;
+    });
+    doc.setFont('helvetica','normal');
+  }
+  function spacer(h){ y += (h||8); }
+
+  if(which==='background'){
+    header('Background Screening Authorization');
+    line(textBackground());
+  } else if(which==='emergency'){
+    header('Emergency Contact Information');
+    line(textEmergency());
+  } else if(which==='privacy'){
+    header('Customer Privacy, Access/Security & Product Safety Acknowledgment');
+    line('Contractor name: '+val('ps_name'));
+    spacer(6);
+    const sections = [
+      ['1. Customer Privacy & Confidentiality', ['ps_1_1','ps_1_2','ps_1_3','ps_1_4','ps_1_5']],
+      ['2. Property Access & Security', ['ps_2_1','ps_2_2','ps_2_3','ps_2_4','ps_2_5','ps_2_6']],
+      ['3. Customer Property & Incident Reporting', ['ps_3_1','ps_3_2','ps_3_3','ps_3_4']],
+      ['4. Product & Chemical Safety', ['ps_4_1','ps_4_2','ps_4_3','ps_4_4','ps_4_5','ps_4_6','ps_4_7']],
+    ];
+    sections.forEach(([label, ids])=>{
+      spacer(4);
+      line(label, {bold:true});
+      ids.forEach(id=> line((val(id)?'[x] ':'[ ] ') + PS_LABELS[id]));
+    });
+    spacer(10);
+    line('Signature: '+val('ps_signature'));
+    line('Printed name: '+val('ps_printedName'));
+    line('Date: '+val('ps_date'));
+  }
+
+  const nameForFile = (which==='privacy' ? val('ps_name') : which==='emergency' ? val('ec_name') : val('bg_fullName')) || 'contractor';
+  doc.save('One18-'+which+'-'+nameForFile.replace(/[^a-z0-9]+/gi,'-')+'.pdf');
+}
+
+/* ---------------- Final submit (email) ---------------- */
+function submitAll(){
+  const allOk = checkAllForms();
+  const errEl = document.getElementById('submitError');
+  const okEl = document.getElementById('submitOk');
+  if(!allOk){
+    errEl.style.display = 'block';
+    okEl.style.display = 'none';
+    errEl.textContent = 'One or more forms are incomplete — check the status next to each tab, finish anything unchecked or blank, then come back here.';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const name = val('bg_fullName') || val('ps_name') || val('ec_name') || 'New Contractor';
+  const subject = 'Contractor Onboarding Forms — ' + name;
+  let body = 'ONE:18 CLEANING — CONTRACTOR ONBOARDING FORMS\n';
+  body += '================================================\n\n';
+  body += textBackground() + '\n------------------------------------------------\n\n';
+  body += textEmergency() + '\n------------------------------------------------\n\n';
+  body += textPrivacy();
+
+  const mailto = 'mailto:info@one18cleaning.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  window.location.href = mailto;
+  okEl.style.display = 'block';
+}
+</script>
+</body>
+</html>
