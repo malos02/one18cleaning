@@ -348,7 +348,7 @@
         <button class="btn btn-ghost" onclick="checkAllForms()">Re-check status</button>
         <button class="btn btn-gold" onclick="submitAll()">Submit all forms by email</button>
       </div>
-      <p class="sig-hint" style="margin-top:14px;">If your email app doesn't open properly, go back to each tab and use "Download this form (PDF)," then attach the three files to an email addressed to <b>info@one18cleaning.com</b>.</p>
+      <p class="sig-hint" style="margin-top:14px;">Clicking submit automatically downloads all three completed forms as PDFs to your device, then opens your email app addressed to <b>info@one18cleaning.com</b> with clear instructions to attach those three files before sending.</p>
     </section>
 
   </main>
@@ -484,7 +484,7 @@ function textPrivacy(){
 }
 
 /* ---------------- PDF download per form ---------------- */
-function downloadForm(which){
+function downloadForm(which, forcedSlug){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'letter' });
   const margin = 54;
@@ -549,11 +549,11 @@ function downloadForm(which){
     line('Date: '+val('ps_date'));
   }
 
-  const nameForFile = (which==='privacy' ? val('ps_name') : which==='emergency' ? val('ec_name') : val('bg_fullName')) || 'contractor';
+  const nameForFile = forcedSlug || (which==='privacy' ? val('ps_name') : which==='emergency' ? val('ec_name') : val('bg_fullName')) || 'contractor';
   doc.save('One18-'+which+'-'+nameForFile.replace(/[^a-z0-9]+/gi,'-')+'.pdf');
 }
 
-/* ---------------- Final submit (email) ---------------- */
+/* ---------------- Final submit (email + auto PDF downloads) ---------------- */
 function submitAll(){
   const allOk = checkAllForms();
   const errEl = document.getElementById('submitError');
@@ -567,16 +567,37 @@ function submitAll(){
   errEl.style.display = 'none';
 
   const name = val('bg_fullName') || val('ps_name') || val('ec_name') || 'New Contractor';
+  const slug = name.replace(/[^a-z0-9]+/gi,'-');
+  const filenames = [
+    'One18-background-'+slug+'.pdf',
+    'One18-emergency-'+slug+'.pdf',
+    'One18-privacy-'+slug+'.pdf'
+  ];
+
+  // Download all three completed forms as PDFs first, so they're sitting in the
+  // downloads folder ready to attach by the time the email opens.
+  downloadForm('background', slug);
+  downloadForm('emergency', slug);
+  downloadForm('privacy', slug);
+
   const subject = 'Contractor Onboarding Forms — ' + name;
   let body = 'ONE:18 CLEANING — CONTRACTOR ONBOARDING FORMS\n';
+  body += '================================================\n\n';
+  body += '>>> 3 PDF files were just downloaded to your device:\n';
+  filenames.forEach(f=> body += '    - ' + f + '\n');
+  body += '>>> Please ATTACH all three files to this email before sending.\n\n';
   body += '================================================\n\n';
   body += textBackground() + '\n------------------------------------------------\n\n';
   body += textEmergency() + '\n------------------------------------------------\n\n';
   body += textPrivacy();
 
   const mailto = 'mailto:info@one18cleaning.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-  window.location.href = mailto;
+
+  // Give the three downloads a moment to actually start before navigating away to the mail client.
+  setTimeout(()=>{ window.location.href = mailto; }, 400);
+
   okEl.style.display = 'block';
+  okEl.innerHTML = '3 PDF files just downloaded to your device: <b>' + filenames.join('</b>, <b>') + '</b>. Your email app should open next — attach those three files before hitting send.';
 }
 </script>
 </body>
