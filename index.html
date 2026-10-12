@@ -1011,6 +1011,27 @@
     return s;
   }
 
+  // Fetch the contractor's open jobs. Always uses a fresh login token, gives up
+  // after 15s instead of hanging, and on a 401 refreshes the login once and retries.
+  // (The old waiting screen reused an expired token forever after the phone slept.)
+  async function fetchOpenJobs(select){
+    const url = `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=${select}&order=updated_at.desc`;
+    const attempt = async ()=>{
+      const s = await ensureSession();
+      if(s) session = s;
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), 15000);
+      try{ return await fetch(url, { headers: authHeaders(), signal: ctrl.signal }); }
+      finally{ clearTimeout(t); }
+    };
+    let res = await attempt();
+    if(res.status === 401 || res.status === 403){
+      const s = session ? await refreshSession(session) : null;
+      if(s){ session = s; res = await attempt(); }
+    }
+    return res;
+  }
+
   let jobsIndex = [];
   let current = null; // full job object in memory
   let detailsOpen = false;
@@ -1154,41 +1175,71 @@
       <div style="font-size:44px;margin-bottom:16px;">🏠</div>
       <h2 style="font-family:\'Fraunces\',serif;color:var(--navy);margin:0 0 10px;font-size:22px;">${title}</h2>
       <p style="color:var(--slate);font-size:14px;line-height:1.6;margin:0 0 28px;max-width:280px;">${message}</p>
-      <div style="font-size:12px;color:var(--slate);margin-bottom:6px;" id="waitingStatus">This page will be updated when a job is assigned.</div>
+      <div style="font-size:12px;color:var(--slate);margin-bottom:14px;" id="waitingStatus">This page will be updated when a job is assigned.</div>
+      <button id="waitingCheckBtn" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:700;cursor:pointer;">Check for my job</button>
     `;
     document.body.appendChild(overlay);
 
-    // Poll every 30s for a newly assigned job
-    let pollCount = 0;
+    // Poll every 30s for a newly assigned job. Also re-checks instantly when the
+    // button is tapped or the phone wakes up / regains signal (see listeners below).
+    let polling = false;
+    let timer = null;
     const poll = async ()=>{
-      pollCount++;
+      if(!document.getElementById('waitingScreen')) return; // screen already gone
+      if(polling) return;
+      polling = true;
+      clearTimeout(timer);
       const el = document.getElementById('waitingStatus');
       if(el) el.textContent = 'Checking for your next job…';
+      let signedOut = false;
       try{
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at&order=updated_at.desc`,
-          { headers: authHeaders() }
-        );
+        const res = await fetchOpenJobs('id,data,updated_at,assigned_to');
         if(res.ok){
           const rows = await res.json();
           const assigned = rows.filter(r => r.data && !r.data.removedByAdmin);
           if(assigned.length){
             overlay.remove();
+            waitingCheckNow = null;
             current = assigned[0].data;
             // Persist the DB-level assigned_to into current so saves include it
             if(!current.assignedTo && assigned[0].assigned_to) current.assignedTo = assigned[0].assigned_to;
             await loadJobsIndex();
             render();
             toast('New job assigned — ready to start');
+            polling = false;
             return;
           }
+        } else if(res.status === 401 || res.status === 403){
+          // Login expired and could not be refreshed — ask them to sign in again
+          signedOut = true;
         }
       }catch(e){ console.error('poll error', e); }
+      polling = false;
+      if(signedOut){
+        clearSession();
+        waitingCheckNow = null;
+        overlay.remove();
+        $('loginGate').classList.add('open');
+        return;
+      }
       if(el) el.textContent = 'This page will be updated when a job is assigned.';
-      setTimeout(poll, 30000);
+      timer = setTimeout(poll, 30000);
     };
-    setTimeout(poll, 3000); // First check after 3s
+    waitingCheckNow = poll;
+    const btn = document.getElementById('waitingCheckBtn');
+    if(btn) btn.onclick = poll;
+    timer = setTimeout(poll, 3000); // First check after 3s
   }
+
+  // Hook for the waiting screen's "check now". Phones freeze timers while the screen is
+  // off or the browser is in the background, so re-check as soon as the page is visible
+  // or the connection comes back instead of waiting for a timer that may never fire.
+  let waitingCheckNow = null;
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible' && waitingCheckNow) waitingCheckNow();
+  });
+  window.addEventListener('online', ()=>{ if(waitingCheckNow) waitingCheckNow(); });
+  window.addEventListener('focus', ()=>{ if(waitingCheckNow) waitingCheckNow(); });
 
   /* ---- Pay Schedule ---- */
   const PAY_TIERS = [
@@ -1363,10 +1414,7 @@
     const removeLoader = ()=>{ const el = document.getElementById('bootLoading'); if(el) el.remove(); };
 
     const tryFetch = async ()=>{
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/jobs?status=eq.in_progress&assigned_to=not.is.null&select=id,data,updated_at,assigned_to&order=updated_at.desc`,
-        { headers: authHeaders() }
-      );
+      const res = await fetchOpenJobs('id,data,updated_at,assigned_to');
       if(!res.ok) throw new Error('fetch failed: '+res.status);
       return res.json();
     };
